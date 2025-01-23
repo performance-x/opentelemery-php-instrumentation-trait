@@ -15,59 +15,94 @@ The trait is designed to be used in instrumentation classes that register OpenTe
 ```php
 <?php
 
-namespace MyNamespace\Instrumentation;
+namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
-use MyNamespace\TargetInterface;
+use Drupal\Core\Cache\CacheBackendInterface;
+use OpenTelemetry\API\Trace\SpanKind;
 use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
 
-class TargetInstrumentation
-{
-    use InstrumentationTrait;
+class CacheBackendInstrumentation {
+  use InstrumentationTrait;
 
-    protected const CLASSNAME = TargetInterface::class;
+  protected const CLASSNAME = CacheBackendInterface::class;
 
-    public static function register(): void
-    {
-        // Initialize with your instrumentation name
-        static::initializeInstrumentation('io.opentelemetry.contrib.php.mypackage');
+  public static function register(): void {
+    // Initialize with name and prefix
+    static::initialize(
+      name: 'io.opentelemetry.contrib.php.drupal',
+      prefix: 'drupal.cache'
+    );
 
-        // Set prefix for all span attributes (optional)
-        static::initializePrefix('mypackage.component');
+    // Or with custom span kind
+    static::initialize(
+      name: 'io.opentelemetry.contrib.php.drupal',
+      prefix: 'drupal.cache',
+      spanKind: SpanKind::KIND_CLIENT
+    );
 
-        // Register hooks for methods
-        static::helperHook(
-            self::CLASSNAME,
-            'methodName',
-            ['param1', 'param2'],  // Parameters to capture
-            'returnValue'          // Capture return value
-        );
+    // Or with pre-configured instrumentation
+    static::initialize(
+      instrumentation: new CachedInstrumentation('custom.name'),
+      prefix: 'drupal.cache'
+    );
 
-        // With custom handlers
-        static::helperHook(
-            self::CLASSNAME,
-            'otherMethod',
-            ['param1' => 'custom.name'],
-            'result',
-            preHandler: function($spanBuilder, $object, array $params, $class, $function, $filename, $lineno) {
-                $spanBuilder->setAttribute('custom.attribute', 'value');
-            },
-            postHandler: function($span, $object, array $params, $returnValue, $exception) {
-                $span->setAttribute('custom.result', $returnValue);
-            }
-        );
-    }
+    // Register method hooks
+    static::helperHook(
+      self::CLASSNAME,
+      'get',
+      ['cid'],
+      'returnValue'
+    );
+
+    // With custom handlers
+    static::helperHook(
+      self::CLASSNAME,
+      'set',
+      ['cid', 'data', 'expire', 'tags'],
+      'returnValue',
+      preHandler: function($spanBuilder, $object, array $params, $class, $function, $filename, $lineno) {
+        $spanBuilder->setAttribute('cache.ttl', $params[2] ?? 0);
+      },
+      postHandler: function($span, $object, array $params, $returnValue, $exception) {
+        $span->setAttribute('cache.success', $returnValue !== FALSE);
+      }
+    );
+  }
 }
 ```
 
 ## Features
 
 - Easy initialization of OpenTelemetry instrumentation
-- Automatic parameter mapping to span attributes
-- Custom prefix for all span attributes
-- Support for pre and post handlers
+- Configurable span kind (defaults to INTERNAL)
+- Automatic prefix for all span attributes
+- Parameter mapping to span attributes
+- Support for pre and post handlers with span access
 - Automatic exception handling
 - Return value capturing
 - Code location attributes (function, namespace, file, line)
+
+## Configuration Options
+
+The `initialize()` method accepts the following parameters:
+
+- `instrumentation`: Optional pre-configured CachedInstrumentation instance
+- `prefix`: Optional prefix for all span attributes
+- `spanKind`: Kind of spans to create (default: INTERNAL)
+- `name`: Name of the instrumentation if no CachedInstrumentation provided
+
+At least one of `instrumentation` or `name` must be provided.
+
+## Hook Configuration
+
+The `helperHook()` method accepts:
+
+- `className`: The class or interface to instrument
+- `methodName`: The method to hook
+- `paramMap`: Array of parameters to capture as attributes
+- `returnValueKey`: Optional key for the return value attribute
+- `preHandler`: Optional callback for custom span building
+- `postHandler`: Optional callback for custom span finishing
 
 ## Requirements
 
