@@ -1,0 +1,43 @@
+{
+    "name": "performance-x/opentelemetry-php-instrumentation-trait",
+    "description": "A trait to simplify creating OpenTelemetry instrumentations for PHP classes and interfaces",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "opentelemetry",
+        "instrumentation",
+        "monitoring",
+        "performance",
+        "tracing"
+    ],
+    "require": {
+        "php": "^8.0",
+        "open-telemetry/api": "^1.0",
+        "open-telemetry/context": "^1.0",
+        "open-telemetry/sem-conv": "^1.0"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^9.5",
+        "squizlabs/php_codesniffer": "^3.7",
+        "phpstan/phpstan": "^1.10"
+    },
+    "autoload": {
+        "psr-4": {
+            "PerformanceX\\OpenTelemetry\\Instrumentation\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PerformanceX\\OpenTelemetry\\Instrumentation\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "cs-check": "phpcs",
+        "cs-fix": "phpcbf",
+        "static-analysis": "phpstan analyse"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}
