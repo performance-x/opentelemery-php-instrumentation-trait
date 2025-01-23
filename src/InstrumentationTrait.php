@@ -15,7 +15,7 @@ use Throwable;
 trait InstrumentationTrait {
   protected static ?CachedInstrumentation $instrumentation = null;
   protected static ?string $attributePrefix = null;
-  protected static SpanKind $spanKind = SpanKind::KIND_INTERNAL;
+  protected static int $spanKind = SpanKind::KIND_INTERNAL;
 
   /**
    * Initialize the instrumentation with configuration options.
@@ -35,7 +35,7 @@ trait InstrumentationTrait {
   protected static function initialize(
     ?CachedInstrumentation $instrumentation = null,
     ?string $prefix = null,
-    SpanKind $spanKind = SpanKind::KIND_INTERNAL,
+    ?int $spanKind = SpanKind::KIND_INTERNAL,
     ?string $name = null,
   ): void {
     if ($instrumentation === null && $name === null) {
@@ -68,7 +68,7 @@ trait InstrumentationTrait {
     ?callable $postHandler = null
   ): void {
     $resolvedParamMap = static::resolveParamPositions($className, $methodName, $paramMap);
-    hook(
+    static::registerHook(
       $className,
       $methodName,
       pre: static::preHook("$className::$methodName", $resolvedParamMap, $preHandler),
@@ -181,5 +181,17 @@ trait InstrumentationTrait {
       }
     }
     return $resolvedMap;
+  }
+
+  /**
+   * Protected method to allow override of hook registration in tests.
+   */
+  protected static function registerHook(
+    string $className,
+    string $methodName,
+    callable $pre,
+    callable $post
+  ): void {
+    hook($className, $methodName, pre: $pre, post: $post);
   }
 }
