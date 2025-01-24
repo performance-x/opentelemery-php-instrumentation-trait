@@ -13,11 +13,19 @@ use OpenTelemetry\API\Logs\EventLoggerInterface;
 class TestCachedInstrumentation {
   private TracerInterface $tracer;
 
+  /**
+   * @param string $name Required by CachedInstrumentation interface
+   */
   public function __construct(
+    /** @phpstan-ignore-next-line */
     private readonly string $name,
+    /** @phpstan-ignore-next-line */
     private readonly ?string $version = null,
+    /** @phpstan-ignore-next-line */
     private readonly ?string $schemaUrl = null,
+    /** @phpstan-ignore-next-line */
     private readonly iterable $attributes = [],
+
   ) {}
 
   public function setTracer(TracerInterface $tracer): void {
@@ -28,8 +36,24 @@ class TestCachedInstrumentation {
     return $this->tracer;
   }
 
-  // Add these if needed later
-  public function meter(): MeterInterface {}
-  public function logger(): LoggerInterface {}
-  public function eventLogger(): EventLoggerInterface {}
+  /**
+   * @throws \RuntimeException
+   */
+  public function meter(): MeterInterface {
+    throw new \RuntimeException('Not implemented in test class');
+  }
+
+  /**
+   * @throws \RuntimeException
+   */
+  public function logger(): LoggerInterface {
+    throw new \RuntimeException('Not implemented in test class');
+  }
+
+  /**
+   * @throws \RuntimeException
+   */
+  public function eventLogger(): EventLoggerInterface {
+    throw new \RuntimeException('Not implemented in test class');
+  }
 }
