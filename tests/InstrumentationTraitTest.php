@@ -64,7 +64,8 @@ class TestInstrumentation {
 
   protected static array $testParameters = [];
   /**
-   * @var array<string, mixed> */
+   * @var array<string, mixed>
+   */
   protected static array $testReturnValues = [];
   protected static ?\Throwable $testException = NULL;
   protected static ?SpanInterface $testSpan = NULL;
@@ -163,18 +164,23 @@ class TestInstrumentation {
 
 /**
  * Tests for the InstrumentationTrait.
+ *
+ * @coversDefaultClass \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait
  */
 class InstrumentationTraitTest extends TestCase {
   /**
-   * @var \OpenTelemetry\API\Trace\SpanInterface&\PHPUnit\Framework\MockObject\MockObject */
+   * @var \OpenTelemetry\API\Trace\SpanInterface&\PHPUnit\Framework\MockObject\MockObject
+   */
   private SpanInterface $mockSpan;
 
   /**
-   * @var \OpenTelemetry\API\Trace\SpanBuilderInterface&\PHPUnit\Framework\MockObject\MockObject */
+   * @var \OpenTelemetry\API\Trace\SpanBuilderInterface&\PHPUnit\Framework\MockObject\MockObject
+   */
   private SpanBuilderInterface $mockSpanBuilder;
 
   /**
-   * @var \OpenTelemetry\API\Trace\TracerInterface&\PHPUnit\Framework\MockObject\MockObject */
+   * @var \OpenTelemetry\API\Trace\TracerInterface&\PHPUnit\Framework\MockObject\MockObject
+   */
   private TracerInterface $mockTracer;
 
   private TestCachedInstrumentation $testInstrumentation;
@@ -206,8 +212,8 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::getInstrumentation
+   * @covers ::initialize
+   * @covers ::getInstrumentation
    */
   public function testInitialization(): void {
     TestInstrumentation::initialize(
@@ -221,9 +227,14 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testParameterMapping(): void {
     TestInstrumentation::initialize(
@@ -257,9 +268,14 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testCustomHandlers(): void {
     TestInstrumentation::initialize(
@@ -290,8 +306,15 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::helperHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::preHook
+   * @covers ::resolveParamPositions
    */
   public function testExceptionHandling(): void {
     TestInstrumentation::initialize(
@@ -322,8 +345,14 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::helperHook
+   * @covers ::postHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::preHook
+   * @covers ::resolveParamPositions
    */
   public function testReturnValueHandling(): void {
     TestInstrumentation::initialize(
@@ -353,9 +382,14 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testSpanKindConfiguration(): void {
     TestInstrumentation::initialize(
@@ -375,9 +409,13 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::getAttributeName
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testAttributePrefix(): void {
     TestInstrumentation::initialize(
@@ -403,7 +441,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
+   * @covers ::initialize
    */
   public function testInitializationValidation(): void {
     $this->expectException(\RuntimeException::class);
@@ -413,8 +451,13 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testArrayParameterHandling(): void {
     TestInstrumentation::initialize(
@@ -446,8 +489,14 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::helperHook
+   * @covers ::postHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::preHook
+   * @covers ::resolveParamPositions
    */
   public function testComplexReturnValueHandling(): void {
     TestInstrumentation::initialize(
@@ -473,8 +522,13 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testMultipleParameterMapping(): void {
     TestInstrumentation::initialize(
@@ -507,8 +561,13 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testNonExistentParameterMapping(): void {
     TestInstrumentation::initialize(
@@ -534,8 +593,14 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::helperHook
+   * @covers ::postHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::preHook
+   * @covers ::resolveParamPositions
    */
   public function testNestedExceptionHandling(): void {
     TestInstrumentation::initialize(
@@ -562,7 +627,15 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testEmptyPrefixBehavior(): void {
     TestInstrumentation::initialize(
