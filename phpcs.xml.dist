@@ -7,8 +7,14 @@
     <rule ref="DrupalPractice"/>
 
     <!-- Scan these files -->
-    <file>src</file>
-    <file>tests</file>
+    <file>./src</file>
+    <file>./tests</file>
+
+    <!-- PHP extensions to check -->
+    <arg name="extensions" value="php"/>
+
+    <!-- Drupal version -->
+    <config name="drupal_core_version" value="11"/>
 
     <!-- Use 's' to print the full error message -->
     <arg value="s"/>
