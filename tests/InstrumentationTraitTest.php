@@ -19,32 +19,6 @@ use PHPUnit\Framework\TestCase;
 use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
 
 /**
- * Test cached instrumentation class.
- */
-class TestCachedInstrumentation {
-  private TracerInterface $tracer;
-
-  public function __construct(
-    private readonly string $name,
-    private readonly ?string $version = null,
-    private readonly ?string $schemaUrl = null,
-    private readonly iterable $attributes = [],
-  ) {}
-
-  public function setTracer(TracerInterface $tracer): void {
-    $this->tracer = $tracer;
-  }
-
-  public function tracer(): TracerInterface {
-    return $this->tracer;
-  }
-
-  public function meter(): MeterInterface {}
-  public function logger(): LoggerInterface {}
-  public function eventLogger(): EventLoggerInterface {}
-}
-
-/**
  * Test target interface.
  */
 interface TestTargetInterface {
@@ -75,15 +49,19 @@ class TestInstrumentation {
   protected const CLASSNAME = TestTargetInterface::class;
 
   protected static array $testParameters = [];
-  protected static $testReturnValues = [];
-  protected static $testException = null;
-  protected static $testSpan;
+  /** @var array<string, mixed> */
+  protected static array $testReturnValues = [];
+  protected static ?\Throwable $testException = null;
+  protected static ?SpanInterface $testSpan = null;
 
   public static function setTestParameters(string $methodName, array $params): void {
     static::$testParameters[$methodName] = $params;
   }
 
-  public static function setTestReturnValue(string $methodName, $value): void {
+  /**
+   * @param mixed $value
+   */
+  public static function setTestReturnValue(string $methodName, mixed $value): void {
     static::$testReturnValues[$methodName] = $value;
   }
 
@@ -91,12 +69,11 @@ class TestInstrumentation {
     static::$testException = $exception;
   }
 
-  public static function setTestSpan($span): void {
+  public static function setTestSpan(SpanInterface $span): void {
     static::$testSpan = $span;
   }
 
-
-  protected static function getSpanFromContext($context) {
+  protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
     return static::$testSpan;
   }
 
@@ -149,13 +126,14 @@ class TestInstrumentation {
  * Tests for the InstrumentationTrait.
  */
 class InstrumentationTraitTest extends TestCase {
-  private $mockSpan;
-  private $mockSpanBuilder;
-  private $mockTracer;
-  private $mockScope;
-  private $testInstrumentation;
+  private SpanInterface $mockSpan;
+  private SpanBuilderInterface $mockSpanBuilder;
+  private TracerInterface $mockTracer;
+  /** @var ScopeInterface|null */
+  private ?ScopeInterface $mockScope = null;
+  private TestCachedInstrumentation $testInstrumentation;
 
-protected function setUp(): void {
+  protected function setUp(): void {
     parent::setUp();
 
     // Mock span
@@ -175,9 +153,8 @@ protected function setUp(): void {
     // Create test instrumentation
     $this->testInstrumentation = new TestCachedInstrumentation('test');
     $this->testInstrumentation->setTracer($this->mockTracer);
-
     TestInstrumentation::setTestSpan($this->mockSpan);
-}
+  }
 
   /**
    * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
@@ -382,7 +359,7 @@ protected function setUp(): void {
    * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
    */
   public function testInitializationValidation(): void {
-    $this->expectException(\RuntimeException::class);
+    $this->expectException(\AssertionError::class);
     $this->expectExceptionMessage('Either instrumentation or name must be provided');
 
     TestInstrumentation::initialize();
