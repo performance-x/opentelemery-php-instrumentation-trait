@@ -25,8 +25,8 @@ jobs:
       uses: shivammathur/setup-php@v2
       with:
         php-version: ${{ matrix.php-version }}
-        coverage: xdebug
-        extensions: opentelemetry
+        coverage: pcov
+        extensions: opentelemetry pcov
 
     - name: Validate composer.json and composer.lock
       run: composer validate --strict
@@ -41,7 +41,7 @@ jobs:
           ${{ runner.os }}-${{ matrix.php-version }}-php-
 
     - name: Install dependencies
-      run: composer install --dev --prefer-dist --no-progress
+      run: composer install --prefer-dist --no-progress
 
     # Add a test script to composer.json, for instance: "test": "vendor/bin/phpunit"
     # Docs: https://getcomposer.org/doc/articles/scripts.md
