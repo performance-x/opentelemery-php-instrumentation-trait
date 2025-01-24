@@ -406,8 +406,8 @@ class InstrumentationTraitTest extends TestCase {
    * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
    */
   public function testInitializationValidation(): void {
-    $this->expectException(\AssertionError::class);
-    $this->expectExceptionMessage('Either instrumentation or name must be provided');
+    $this->expectException(\RuntimeException::class);
+    $this->expectExceptionMessage('Either instrumentation or a non-empty name must be provided');
 
     TestInstrumentation::initialize();
   }
