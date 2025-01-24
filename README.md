@@ -61,10 +61,10 @@ class CacheBackendInstrumentation {
       ['cid', 'data', 'expire', 'tags'],
       'returnValue',
       preHandler: function($spanBuilder, $object, array $params, $class, $function, $filename, $lineno) {
-        $spanBuilder->setAttribute('cache.ttl', $params[2] ?? 0);
+        $spanBuilder->setAttribute(static::getAttributeName('ttl'), $params[2] ?? 0);
       },
       postHandler: function($span, $object, array $params, $returnValue, $exception) {
-        $span->setAttribute('cache.success', $returnValue !== FALSE);
+        $span->setAttribute(static::getAttributeName('success'), $returnValue !== FALSE);
       }
     );
   }
@@ -75,7 +75,7 @@ class CacheBackendInstrumentation {
 
 - Easy initialization of OpenTelemetry instrumentation
 - Configurable span kind (defaults to INTERNAL)
-- Automatic prefix for all span attributes
+- Automatic prefix for all span attributes via getAttributeName()
 - Parameter mapping to span attributes
 - Support for pre and post handlers with span access
 - Automatic exception handling
@@ -84,12 +84,12 @@ class CacheBackendInstrumentation {
 
 ## Configuration Options
 
-The `initialize()` method accepts the following parameters:
+The `initialize()` method accepts:
 
-- `instrumentation`: Optional pre-configured CachedInstrumentation instance
+- `instrumentation`: Optional pre-configured instrumentation instance
 - `prefix`: Optional prefix for all span attributes
 - `spanKind`: Kind of spans to create (default: INTERNAL)
-- `name`: Name of the instrumentation if no CachedInstrumentation provided
+- `name`: Name of the instrumentation if no instrumentation instance provided
 
 At least one of `instrumentation` or `name` must be provided.
 
