@@ -29,6 +29,9 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-php-
 
+    - name: Install pcov
+      run: pecl install pcov
+
     - name: Install dependencies
       run: composer install --dev --prefer-dist --no-progress
 
