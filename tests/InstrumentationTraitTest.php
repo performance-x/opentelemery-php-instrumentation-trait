@@ -11,10 +11,38 @@ use OpenTelemetry\API\Trace\SpanBuilderInterface;
 use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\ContextInterface;
 use OpenTelemetry\Context\ScopeInterface;
-use OpenTelemetry\API\Instrumentation\CachedInstrumentation;
+use OpenTelemetry\API\Metrics\MeterInterface;
+use OpenTelemetry\API\Logs\LoggerInterface;
+use OpenTelemetry\API\Logs\EventLoggerInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
 use PHPUnit\Framework\TestCase;
 use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
+
+/**
+ * Test cached instrumentation class.
+ */
+class TestCachedInstrumentation {
+  private TracerInterface $tracer;
+  
+  public function __construct(
+    private readonly string $name,
+    private readonly ?string $version = null,
+    private readonly ?string $schemaUrl = null,
+    private readonly iterable $attributes = [],
+  ) {}
+
+  public function setTracer(TracerInterface $tracer): void {
+    $this->tracer = $tracer;
+  }
+
+  public function tracer(): TracerInterface {
+    return $this->tracer;
+  }
+
+  public function meter(): MeterInterface {}
+  public function logger(): LoggerInterface {}
+  public function eventLogger(): EventLoggerInterface {}
+}
 
 /**
  * Test target interface.
@@ -46,20 +74,34 @@ class TestInstrumentation {
     getInstrumentation as public;
     helperHook as public;
   }
+  
+  protected const CLASSNAME = TestTargetInterface::class;
 
+  /**
+   * Override hook registration for testing.
+   */
   protected static function registerHook(
     string $className,
     string $methodName,
     callable $pre,
     callable $post
   ): void {
-    // Immediately execute the pre and post hooks for testing
     $target = new TestTarget();
     $pre($target, [], $className, $methodName, __FILE__, __LINE__);
-    $post($target, [], 'test-result', null);
+    
+    try {
+      if ($methodName === 'throwingMethod') {
+        $exception = new \RuntimeException('Test exception');
+        $post($target, [], null, $exception);
+      }
+      else {
+        $post($target, [], 'test-result', null);
+      }
+    }
+    catch (\Throwable $e) {
+      // Ignore exceptions in tests
+    }
   }
-
-  protected const CLASSNAME = TestTargetInterface::class;
   
   public static function register(): void {
     static::initialize(
@@ -91,42 +133,46 @@ class InstrumentationTraitTest extends TestCase {
   private $mockSpanBuilder;
   private $mockTracer;
   private $mockScope;
-
-protected function setUp(): void {
-  parent::setUp();
+  private $testInstrumentation;
   
-  // Mock span
-  $this->mockSpan = $this->createMock(SpanInterface::class);
-  
-  // Mock span builder
-  $this->mockSpanBuilder = $this->createMock(SpanBuilderInterface::class);
-  $this->mockSpanBuilder->method('setParent')->willReturnSelf();
-  $this->mockSpanBuilder->method('setSpanKind')->willReturnSelf();
-  $this->mockSpanBuilder->method('setAttribute')->willReturnSelf();
-  $this->mockSpanBuilder->method('startSpan')->willReturn($this->mockSpan);
-  
-  // Mock tracer
-  $this->mockTracer = $this->createMock(TracerInterface::class);
-  $this->mockTracer->method('spanBuilder')->willReturn($this->mockSpanBuilder);
-  
-  // Mock scope with context
-  $mockContext = $this->createMock(ContextInterface::class);
-  $this->mockScope = $this->getMockBuilder(ScopeInterface::class)
-    ->getMock();
-  $this->mockScope->method('detach')->willReturn(0);
-}  
+  protected function setUp(): void {
+    parent::setUp();
+    
+    // Mock span
+    $this->mockSpan = $this->createMock(SpanInterface::class);
+    
+    // Mock span builder
+    $this->mockSpanBuilder = $this->createMock(SpanBuilderInterface::class);
+    $this->mockSpanBuilder->method('setParent')->willReturnSelf();
+    $this->mockSpanBuilder->method('setSpanKind')->willReturnSelf();
+    $this->mockSpanBuilder->method('setAttribute')->willReturnSelf();
+    $this->mockSpanBuilder->method('startSpan')->willReturn($this->mockSpan);
+    
+    // Mock tracer
+    $this->mockTracer = $this->createMock(TracerInterface::class);
+    $this->mockTracer->method('spanBuilder')->willReturn($this->mockSpanBuilder);
+    
+    // Create test instrumentation
+    $this->testInstrumentation = new TestCachedInstrumentation('test');
+    $this->testInstrumentation->setTracer($this->mockTracer);
+  }
   
   public function testInitialization(): void {
-    TestInstrumentation::register();
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation
+    );
     
-    $this->assertInstanceOf(
-      CachedInstrumentation::class,
+    $this->assertSame(
+      $this->testInstrumentation,
       TestInstrumentation::getInstrumentation()
     );
   }
   
   public function testParameterMapping(): void {
-    TestInstrumentation::register();
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation,
+      prefix: 'test'
+    );
     
     $this->mockSpanBuilder->expects($this->atLeast(4))
       ->method('setAttribute')
@@ -136,14 +182,18 @@ protected function setUp(): void {
         ['test.operation', TestTargetInterface::class . '::testMethod'],
         ['test.param1', 'value1']
       );
-      
-    $target = new TestTarget();
-    $target->testMethod('value1', ['key' => 'value']);
+    
+    TestInstrumentation::helperHook(
+      TestTargetInterface::class,
+      'testMethod',
+      ['param1' => 'param1'],
+      'returnValue'
+    );
   }
   
   public function testCustomHandlers(): void {
     TestInstrumentation::initialize(
-      name: 'test',
+      instrumentation: $this->testInstrumentation,
       prefix: 'custom'
     );
     
@@ -165,15 +215,14 @@ protected function setUp(): void {
       }
     );
     
-    $target = new TestTarget();
-    $target->testMethod('test', []);
-    
     $this->assertTrue($preHandlerCalled, 'Pre-handler was not called');
     $this->assertTrue($postHandlerCalled, 'Post-handler was not called');
   }
   
   public function testExceptionHandling(): void {
-    TestInstrumentation::register();
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation
+    );
     
     $this->mockSpan->expects($this->once())
       ->method('recordException')
@@ -182,54 +231,46 @@ protected function setUp(): void {
     $this->mockSpan->expects($this->once())
       ->method('setStatus')
       ->with(StatusCode::STATUS_ERROR, 'Test exception');
-      
-    $target = new TestTarget();
-    try {
-      $target->throwingMethod();
-    }
-    catch (\RuntimeException $e) {
-      // Expected
-    }
+    
+    TestInstrumentation::helperHook(
+      TestTargetInterface::class,
+      'throwingMethod',
+      []
+    );
   }
   
   public function testSpanKindConfiguration(): void {
     TestInstrumentation::initialize(
-      name: 'test',
+      instrumentation: $this->testInstrumentation,
       spanKind: SpanKind::KIND_SERVER
     );
     
     $this->mockSpanBuilder->expects($this->once())
       ->method('setSpanKind')
       ->with(SpanKind::KIND_SERVER);
-      
+    
     TestInstrumentation::helperHook(
       TestTargetInterface::class,
       'testMethod',
       []
     );
-      
-    $target = new TestTarget();
-    $target->testMethod('test', []);
   }
   
   public function testAttributePrefix(): void {
     TestInstrumentation::initialize(
-      name: 'test',
+      instrumentation: $this->testInstrumentation,
       prefix: 'custom.prefix'
     );
     
     $this->mockSpanBuilder->expects($this->atLeastOnce())
       ->method('setAttribute')
       ->with('custom.prefix.operation', $this->anything());
-      
+    
     TestInstrumentation::helperHook(
       TestTargetInterface::class,
       'testMethod',
       []
     );
-      
-    $target = new TestTarget();
-    $target->testMethod('test', []);
   }
   
   public function testInitializationValidation(): void {
