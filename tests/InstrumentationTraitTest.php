@@ -12,47 +12,20 @@ use OpenTelemetry\SemConv\TraceAttributes;
 use PHPUnit\Framework\TestCase;
 use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
 
-/**
- * Test target interface.
- */
 interface TestTargetInterface {
-
-  /**
-   *
-   */
   public function testMethod(string $param1, array $param2): string;
-
-  /**
-   *
-   */
   public function throwingMethod(): void;
-
 }
 
-/**
- * Test target implementation.
- */
 class TestTarget implements TestTargetInterface {
-
-  /**
-   *
-   */
   public function testMethod(string $param1, array $param2): string {
     return 'test-' . $param1;
   }
-
-  /**
-   *
-   */
   public function throwingMethod(): void {
     throw new \RuntimeException('Test exception');
   }
-
 }
 
-/**
- *
- */
 class TestInstrumentation {
   use InstrumentationTrait {
     initialize as public;
@@ -70,9 +43,6 @@ class TestInstrumentation {
   protected static ?\Throwable $testException = NULL;
   protected static ?SpanInterface $testSpan = NULL;
 
-  /**
-   *
-   */
   public static function setTestParameters(string $methodName, array $params): void {
     static::$testParameters[$methodName] = $params;
   }
@@ -84,23 +54,14 @@ class TestInstrumentation {
     static::$testReturnValues[$methodName] = $value;
   }
 
-  /**
-   *
-   */
   public static function setTestException(\Throwable $exception): void {
     static::$testException = $exception;
   }
 
-  /**
-   *
-   */
   public static function setTestSpan(SpanInterface $span): void {
     static::$testSpan = $span;
   }
 
-  /**
-   *
-   */
   protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
     if (static::$testSpan === NULL) {
       throw new \RuntimeException('Test span not initialized. Call setTestSpan() first.');
@@ -109,9 +70,6 @@ class TestInstrumentation {
     return static::$testSpan;
   }
 
-  /**
-   *
-   */
   protected static function registerHook(
     string $className,
     string $methodName,
@@ -127,37 +85,20 @@ class TestInstrumentation {
     $pre($target, $params, $className, $methodName, $file, $line);
 
     if ($methodName === 'throwingMethod' && static::$testException) {
-      $exception = static::$testException;
-      $post($target, $params, NULL, $exception);
-    }
-    else {
+      $post($target, $params, NULL, static::$testException);
+    } else {
       $returnValue = static::$testReturnValues[$methodName] ?? 'test-result';
       $post($target, $params, $returnValue, NULL);
     }
   }
 
-  /**
-   *
-   */
   public static function register(): void {
     static::initialize(
       name: 'io.opentelemetry.contrib.php.test',
       prefix: 'test'
     );
-
-    static::helperHook(
-      self::CLASSNAME,
-      'testMethod',
-      ['param1', 'param2'],
-      'returnValue'
-    );
-
-    static::helperHook(
-      self::CLASSNAME,
-      'throwingMethod',
-      [],
-      'returnValue'
-    );
+    static::helperHook(self::CLASSNAME, 'testMethod', ['param1', 'param2'], 'returnValue');
+    static::helperHook(self::CLASSNAME, 'throwingMethod', [], 'returnValue');
   }
 
 }
@@ -185,9 +126,6 @@ class InstrumentationTraitTest extends TestCase {
 
   private TestCachedInstrumentation $testInstrumentation;
 
-  /**
-   *
-   */
   protected function setUp(): void {
     parent::setUp();
 
@@ -216,20 +154,15 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::getInstrumentation
    */
   public function testInitialization(): void {
-    TestInstrumentation::initialize(
-      instrumentation: $this->testInstrumentation
-    );
-
-    $this->assertSame(
-      $this->testInstrumentation,
-      TestInstrumentation::getInstrumentation()
-    );
+    TestInstrumentation::initialize(instrumentation: $this->testInstrumentation);
+    $this->assertSame($this->testInstrumentation, TestInstrumentation::getInstrumentation());
   }
 
   /**
    * @covers ::helperHook
    * @covers ::preHook
    * @covers ::postHook
+   * @covers ::getSpanFromContext
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
@@ -271,6 +204,7 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::helperHook
    * @covers ::preHook
    * @covers ::postHook
+   * @covers ::getSpanFromContext
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
@@ -347,6 +281,7 @@ class InstrumentationTraitTest extends TestCase {
   /**
    * @covers ::helperHook
    * @covers ::postHook
+   * @covers ::getSpanFromContext
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
@@ -452,11 +387,13 @@ class InstrumentationTraitTest extends TestCase {
 
   /**
    * @covers ::helperHook
-   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
    * @covers ::getInstrumentation
+   * @covers ::preHook
    * @covers ::resolveParamPositions
    */
   public function testArrayParameterHandling(): void {
@@ -491,6 +428,7 @@ class InstrumentationTraitTest extends TestCase {
   /**
    * @covers ::helperHook
    * @covers ::postHook
+   * @covers ::getSpanFromContext
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
@@ -595,6 +533,7 @@ class InstrumentationTraitTest extends TestCase {
   /**
    * @covers ::helperHook
    * @covers ::postHook
+   * @covers ::getSpanFromContext
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
@@ -631,6 +570,7 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::helperHook
    * @covers ::preHook
    * @covers ::postHook
+   * @covers ::getSpanFromContext
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
