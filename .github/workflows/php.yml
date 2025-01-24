@@ -13,24 +13,32 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
-
+    continue-on-error: false
+    strategy:
+      fail-fast: false
+      matrix:
+        php-version: ['8.0', '8.1', '8.2', '8.3']
     steps:
     - uses: actions/checkout@v4
+
+    - name: Setup PHP
+      uses: shivammathur/setup-php@v2
+      with:
+        php-version: ${{ matrix.php-version }}
+        coverage: xdebug
+        extensions: opentelemetry
 
     - name: Validate composer.json and composer.lock
       run: composer validate --strict
 
     - name: Cache Composer packages
       id: composer-cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: vendor
-        key: ${{ runner.os }}-php-${{ hashFiles('**/composer.lock') }}
+        key: ${{ runner.os }}-${{ matrix.php-version }}-php-${{ hashFiles('**/composer.json') }}
         restore-keys: |
-          ${{ runner.os }}-php-
-
-    - name: Install pcov
-      run: pecl install pcov
+          ${{ runner.os }}-${{ matrix.php-version }}-php-
 
     - name: Install dependencies
       run: composer install --dev --prefer-dist --no-progress
