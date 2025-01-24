@@ -15,7 +15,7 @@ use ReflectionMethod;
 use Throwable;
 
 trait InstrumentationTrait {
-  /** @var \OpenTelemetry\API\Instrumentation\CachedInstrumentation|null */
+  /** @var object|null */
   protected static $instrumentation = null;
   protected static ?string $attributePrefix = null;
   /** @var SpanKind::KIND_* */
@@ -47,6 +47,10 @@ trait InstrumentationTrait {
       'Either instrumentation or name must be provided'
     );
 
+    if ($instrumentation !== null) {
+      assert(method_exists($instrumentation, 'tracer'), 'Instrumentation must implement tracer() method');
+    }
+
     assert(
       in_array($spanKind, [
         SpanKind::KIND_INTERNAL,
@@ -62,7 +66,13 @@ trait InstrumentationTrait {
     static::$spanKind = $spanKind;
   }
 
+  /**
+   * @param string $name
+   * @return non-empty-string
+   */
   protected static function getAttributeName(string $name): string {
+    assert(!empty($name), 'Attribute name cannot be empty');
+
     if (empty(static::$attributePrefix)) {
       return $name;
     }
@@ -71,7 +81,7 @@ trait InstrumentationTrait {
   }
 
   /**
-   * @return \OpenTelemetry\API\Instrumentation\CachedInstrumentation
+   * @return object
    * @throws \RuntimeException
    */
   protected static function getInstrumentation() {
@@ -112,7 +122,11 @@ trait InstrumentationTrait {
       ?int $lineno
     ) use ($operation, $resolvedParamMap, $customHandler): void {
       $parent = static::getCurrentContext();
-      $spanBuilder = static::getInstrumentation()->tracer()->spanBuilder("$class::$function")
+
+      /** @var CachedInstrumentation $instrumentation */
+      $instrumentation = static::getInstrumentation();
+
+      $spanBuilder = $instrumentation->tracer()->spanBuilder("$class::$function")
         ->setParent($parent)
         ->setSpanKind(static::$spanKind)
         ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
