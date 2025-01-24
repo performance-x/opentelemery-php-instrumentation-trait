@@ -65,9 +65,6 @@ class TestTarget implements TestTargetInterface {
   }
 }
 
-/**
- * Test instrumentation implementation.
- */
 class TestInstrumentation {
   use InstrumentationTrait {
     initialize as public;
@@ -77,21 +74,31 @@ class TestInstrumentation {
   
   protected const CLASSNAME = TestTargetInterface::class;
 
-  /**
-   * Store test parameters per method.
-   */
   protected static array $testParameters = [];
+  private static Context $testContext;
+  private static $testContextStorage;
+  private static $testSpan;
 
-  /**
-   * Set test parameters for a method.
-   */
   public static function setTestParameters(string $methodName, array $params): void {
     static::$testParameters[$methodName] = $params;
   }
 
-  /**
-   * Override hook registration for testing.
-   */
+  public static function setTestContext(Context $context): void {
+    static::$testContext = $context;
+  }
+
+  public static function setTestContextStorage($storage): void {
+    static::$testContextStorage = $storage;
+  }
+
+  public static function setTestSpan($span): void {
+    static::$testSpan = $span;
+  }
+
+  protected static function getSpanFromContext($context) {
+    return static::$testSpan;
+  }
+
   protected static function registerHook(
     string $className,
     string $methodName,
@@ -99,27 +106,18 @@ class TestInstrumentation {
     callable $post
   ): void {
     $target = new TestTarget();
-    // Use consistent values for file and line
     $file = '/test/file.php';
     $line = 42;
-
-    // Use configured test parameters or empty array
+    
     $params = static::$testParameters[$methodName] ?? [];
-
+    
     $pre($target, $params, $className, $methodName, $file, $line);
     
-    try {
-      if ($methodName === 'throwingMethod') {
-        $exception = new \RuntimeException('Test exception');
-        $post($target, $params, null, $exception);
-      }
-      else {
-        $returnValue = 'test-result';
-        $post($target, $params, $returnValue, null);
-      }
-    }
-    catch (\Throwable $e) {
-      // Ignore exceptions in tests
+    if ($methodName === 'throwingMethod') {
+      $exception = new \RuntimeException('Test exception');
+      $post($target, $params, null, $exception);
+    } else {
+      $post($target, $params, 'test-result', null);
     }
   }
   
@@ -154,31 +152,31 @@ class InstrumentationTraitTest extends TestCase {
   private $mockTracer;
   private $mockScope;
   private $testInstrumentation;
-  
-  protected function setUp(): void {
+
+protected function setUp(): void {
     parent::setUp();
-
-    // Mock span with specific expectations for exception handling
+    
+    // Mock span
     $this->mockSpan = $this->createMock(SpanInterface::class);
-    $this->mockSpan->method('recordException')->willReturnSelf();
-    $this->mockSpan->method('setStatus')->willReturnSelf();
-
+    
     // Mock span builder
     $this->mockSpanBuilder = $this->createMock(SpanBuilderInterface::class);
     $this->mockSpanBuilder->method('setParent')->willReturnSelf();
     $this->mockSpanBuilder->method('setSpanKind')->willReturnSelf();
     $this->mockSpanBuilder->method('setAttribute')->willReturnSelf();
     $this->mockSpanBuilder->method('startSpan')->willReturn($this->mockSpan);
-
+    
     // Mock tracer
     $this->mockTracer = $this->createMock(TracerInterface::class);
     $this->mockTracer->method('spanBuilder')->willReturn($this->mockSpanBuilder);
-
+    
     // Create test instrumentation
     $this->testInstrumentation = new TestCachedInstrumentation('test');
     $this->testInstrumentation->setTracer($this->mockTracer);
-  }
 
+    TestInstrumentation::setTestSpan($this->mockSpan);
+}
+  
   /**
    * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
    * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::getInstrumentation
