@@ -31,6 +31,7 @@ class TestInstrumentation {
     initialize as public;
     getInstrumentation as public;
     helperHook as public;
+    getSpanFromContext as public traitGetSpanFromContext;
   }
 
   protected const CLASSNAME = TestTargetInterface::class;
@@ -60,6 +61,10 @@ class TestInstrumentation {
 
   public static function setTestSpan(SpanInterface $span): void {
     static::$testSpan = $span;
+  }
+
+  public static function resetInstrumentation(): void {
+    static::$instrumentation = NULL;
   }
 
   protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
@@ -612,6 +617,33 @@ class InstrumentationTraitTest extends TestCase {
       'testMethod',
       []
     );
+  }
+
+  /**
+   * @covers ::getInstrumentation
+   */
+  public function testUninitializedInstrumentation(): void {
+    TestInstrumentation::resetInstrumentation();
+
+    $this->expectException(\RuntimeException::class);
+    $this->expectExceptionMessage('Instrumentation not initialized. Call initialize() first.');
+    TestInstrumentation::getInstrumentation();
+  }
+
+  /**
+   * @covers ::initialize
+   * @covers ::getSpanFromContext
+   */
+  public function testGetSpanFromContext(): void {
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation
+    );
+
+    $context = $this->createMock(ContextInterface::class);
+
+    // This should work as expected
+    $span = TestInstrumentation::traitGetSpanFromContext($context);
+    $this->assertInstanceOf(\OpenTelemetry\API\Trace\NonRecordingSpan::class, $span);
   }
 
 }
