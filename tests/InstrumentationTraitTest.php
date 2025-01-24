@@ -73,7 +73,11 @@ class TestInstrumentation {
     static::$testSpan = $span;
   }
 
-  protected static function getSpanFromContext(ContextInterface $context): ?SpanInterface {
+  protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
+    if (static::$testSpan === null) {
+      throw new \RuntimeException('Test span not initialized. Call setTestSpan() first.');
+    }
+
     return static::$testSpan;
   }
 
@@ -126,11 +130,15 @@ class TestInstrumentation {
  * Tests for the InstrumentationTrait.
  */
 class InstrumentationTraitTest extends TestCase {
+  /** @var SpanInterface&\PHPUnit\Framework\MockObject\MockObject */
   private SpanInterface $mockSpan;
+
+  /** @var SpanBuilderInterface&\PHPUnit\Framework\MockObject\MockObject */
   private SpanBuilderInterface $mockSpanBuilder;
+
+  /** @var TracerInterface&\PHPUnit\Framework\MockObject\MockObject */
   private TracerInterface $mockTracer;
-  /** @var ScopeInterface|null */
-  private ?ScopeInterface $mockScope = null;
+
   private TestCachedInstrumentation $testInstrumentation;
 
   protected function setUp(): void {
