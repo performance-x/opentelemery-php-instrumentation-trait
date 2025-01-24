@@ -1,16 +1,57 @@
 <?xml version="1.0"?>
-<ruleset name="OpenTelemetry Instrumentation Trait coding standard">
-    <description>OpenTelemetry Instrumentation Trait coding standard</description>
+<ruleset name="OpenTelemetry Instrumentation">
+    <description>Coding standards for OpenTelemetry Instrumentation Trait</description>
 
-    <!-- display progress -->
-    <arg value="p"/>
+    <!-- Use Drupal coding standards -->
+    <rule ref="Drupal">
+        <!-- Disable overly strict documentation rules -->
+        <exclude name="Drupal.Commenting.DocComment.MissingShort"/>
+        <exclude name="Drupal.Commenting.DocComment.Empty"/>
+        <exclude name="Drupal.Commenting.VariableComment.Missing"/>
+        <exclude name="Drupal.Commenting.FunctionComment.MissingParamComment"/>
+        <exclude name="Drupal.Commenting.FunctionComment.MissingReturnComment"/>
+        <exclude name="Drupal.Commenting.FunctionComment.ParamMissingDefinition"/>
+        <exclude name="Drupal.Classes.ClassFileName.NoMatch"/>
+    </rule>
+    <rule ref="DrupalPractice"/>
+
+    <!-- Scan these files -->
+    <file>./src/</file>
+    <file>./tests/</file>
+
+    <!-- PHP extensions to check -->
+    <arg name="extensions" value="php"/>
+
+    <!-- Drupal version -->
+    <config name="drupal_core_version" value="11"/>
+
+    <!-- Use 's' to print the full error message -->
+    <arg value="s"/>
     <arg name="colors"/>
 
-    <!-- inherit rules from: -->
-    <rule ref="PSR12"/>
-    <rule ref="Generic.Arrays.DisallowLongArraySyntax"/>
+    <!-- Two spaces for indentation -->
+    <rule ref="Generic.WhiteSpace.ScopeIndent">
+        <properties>
+            <property name="indent" value="2"/>
+            <property name="tabIndent" value="false"/>
+        </properties>
+    </rule>
 
-    <!-- Paths to check -->
-    <file>src</file>
-    <file>tests</file>
+    <!-- Line length -->
+    <rule ref="Drupal.Files.LineLength">
+        <properties>
+            <property name="lineLimit" value="100"/>
+            <property name="absoluteLineLimit" value="120"/>
+        </properties>
+    </rule>
+
+    <!-- Class/file naming -->
+    <rule ref="Drupal.NamingConventions.ValidClassName"/>
+
+    <!-- Ensure proper file doc blocks -->
+    <rule ref="Drupal.Commenting.FileComment"/>
+    <rule ref="Drupal.Commenting.DocComment"/>
+
+    <!-- PHP version compatibility -->
+    <config name="php_version" value="80000"/>
 </ruleset>
