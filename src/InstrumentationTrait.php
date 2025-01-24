@@ -24,7 +24,7 @@ trait InstrumentationTrait {
   /**
    * Initialize the instrumentation with configuration options.
    *
-   * @param \OpenTelemetry\API\Instrumentation\CachedInstrumentation|null $instrumentation
+   * @param object|null $instrumentation
    *   Optional pre-configured instrumentation.
    * @param string|null $prefix
    *   Prefix for all span attributes.

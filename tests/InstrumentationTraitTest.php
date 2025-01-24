@@ -73,7 +73,7 @@ class TestInstrumentation {
     static::$testSpan = $span;
   }
 
-  protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
+  protected static function getSpanFromContext(ContextInterface $context): ?SpanInterface {
     return static::$testSpan;
   }
 
