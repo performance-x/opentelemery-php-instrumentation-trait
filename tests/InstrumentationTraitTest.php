@@ -214,11 +214,6 @@ class InstrumentationTraitTest extends TestCase {
       instrumentation: $this->testInstrumentation
     );
 
-    /**
-     * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-     * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
-     * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::resolveParamPositions
-     */
     $this->assertSame(
       $this->testInstrumentation,
       TestInstrumentation::getInstrumentation()

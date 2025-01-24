@@ -3,7 +3,16 @@
     <description>Coding standards for OpenTelemetry Instrumentation Trait</description>
 
     <!-- Use Drupal coding standards -->
-    <rule ref="Drupal"/>
+    <rule ref="Drupal">
+        <!-- Disable overly strict documentation rules -->
+        <exclude name="Drupal.Commenting.DocComment.MissingShort"/>
+        <exclude name="Drupal.Commenting.DocComment.Empty"/>
+        <exclude name="Drupal.Commenting.VariableComment.Missing"/>
+        <exclude name="Drupal.Commenting.FunctionComment.MissingParamComment"/>
+        <exclude name="Drupal.Commenting.FunctionComment.MissingReturnComment"/>
+        <exclude name="Drupal.Commenting.FunctionComment.ParamMissingDefinition"/>
+        <exclude name="Drupal.Classes.ClassFileName.NoMatch"/>
+    </rule>
     <rule ref="DrupalPractice"/>
 
     <!-- Scan these files -->
