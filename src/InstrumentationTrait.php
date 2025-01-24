@@ -7,14 +7,18 @@ use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\API\Instrumentation\CachedInstrumentation;
 use OpenTelemetry\Context\Context;
+use OpenTelemetry\Context\ContextInterface;
+use OpenTelemetry\Context\ContextStorageInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
 use function OpenTelemetry\Instrumentation\hook;
 use ReflectionMethod;
 use Throwable;
 
 trait InstrumentationTrait {
+  /** @var \OpenTelemetry\API\Instrumentation\CachedInstrumentation|null */
   protected static $instrumentation = null;
   protected static ?string $attributePrefix = null;
+  /** @var SpanKind::KIND_* */
   protected static int $spanKind = SpanKind::KIND_INTERNAL;
 
   /**
@@ -24,7 +28,7 @@ trait InstrumentationTrait {
    *   Optional pre-configured instrumentation.
    * @param string|null $prefix
    *   Prefix for all span attributes.
-   * @param \OpenTelemetry\API\Trace\SpanKind $spanKind
+   * @param \OpenTelemetry\API\Trace\SpanKind::KIND_* $spanKind
    *   Kind of spans to create (default: INTERNAL).
    * @param string|null $name
    *   Name of the instrumentation if no CachedInstrumentation provided.
@@ -38,9 +42,21 @@ trait InstrumentationTrait {
     ?int $spanKind = SpanKind::KIND_INTERNAL,
     ?string $name = null,
   ): void {
-    if ($instrumentation === null && $name === null) {
-      throw new \RuntimeException('Either instrumentation or name must be provided');
-    }
+    assert(
+      $instrumentation !== null || $name !== null,
+      'Either instrumentation or name must be provided'
+    );
+
+    assert(
+      in_array($spanKind, [
+        SpanKind::KIND_INTERNAL,
+        SpanKind::KIND_CLIENT,
+        SpanKind::KIND_SERVER,
+        SpanKind::KIND_PRODUCER,
+        SpanKind::KIND_CONSUMER
+      ], true),
+      'Invalid span kind provided'
+    );
     static::$instrumentation = $instrumentation ?? new CachedInstrumentation($name);
     static::$attributePrefix = $prefix;
     static::$spanKind = $spanKind;
@@ -54,6 +70,10 @@ trait InstrumentationTrait {
     return static::$attributePrefix . '.' . $name;
   }
 
+  /**
+   * @return \OpenTelemetry\API\Instrumentation\CachedInstrumentation
+   * @throws \RuntimeException
+   */
   protected static function getInstrumentation() {
     if (static::$instrumentation === null) {
       throw new \RuntimeException('Instrumentation not initialized. Call initialize() first.');
@@ -131,7 +151,7 @@ trait InstrumentationTrait {
       array $params,
       $returnValue,
       ?Throwable $exception
-    ) use ($operation, $resultAttribute, $customHandler): void {
+    ) use ($resultAttribute, $customHandler): void {
       $scope = static::getContextStorage()->scope();
       if (!$scope) {
         return;
@@ -198,23 +218,24 @@ trait InstrumentationTrait {
   }
 
   /**
-   * Protected method to allow override of Context::getCurrent() in tests.
+   * @return \OpenTelemetry\Context\ContextInterface
    */
-  protected static function getCurrentContext() {
+  protected static function getCurrentContext(): ContextInterface {
     return Context::getCurrent();
   }
 
   /**
-   * Protected method to allow override of Context::storage() in tests.
+   * @return \OpenTelemetry\Context\ContextStorageInterface
    */
-  protected static function getContextStorage() {
+  protected static function getContextStorage(): ContextStorageInterface {
     return Context::storage();
   }
 
   /**
-   * Protected method to allow override of Span::fromContext() in tests.
+   * @param \OpenTelemetry\Context\Context $context
+   * @return \OpenTelemetry\API\Trace\SpanInterface
    */
-  protected static function getSpanFromContext($context) {
+  protected static function getSpanFromContext(Context $context) {
     return Span::fromContext($context);
   }
 
