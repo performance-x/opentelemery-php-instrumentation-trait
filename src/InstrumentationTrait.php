@@ -11,14 +11,17 @@ use OpenTelemetry\Context\ContextInterface;
 use OpenTelemetry\Context\ContextStorageInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
 use function OpenTelemetry\Instrumentation\hook;
-use ReflectionMethod;
-use Throwable;
 
+/**
+ *
+ */
 trait InstrumentationTrait {
-  /** @var object|null */
-  protected static $instrumentation = null;
-  protected static ?string $attributePrefix = null;
-  /** @var SpanKind::KIND_* */
+  /**
+   * @var object|null */
+  protected static $instrumentation = NULL;
+  protected static ?string $attributePrefix = NULL;
+  /**
+   * @var \OpenTelemetry\API\Trace\SpanKind::KIND_* */
   protected static int $spanKind = SpanKind::KIND_INTERNAL;
 
   /**
@@ -37,17 +40,17 @@ trait InstrumentationTrait {
    *   When neither instrumentation nor name is provided.
    */
   protected static function initialize(
-    $instrumentation = null,
-    ?string $prefix = null,
+    $instrumentation = NULL,
+    ?string $prefix = NULL,
     ?int $spanKind = SpanKind::KIND_INTERNAL,
-    ?string $name = null,
+    ?string $name = NULL,
   ): void {
     assert(
-      $instrumentation !== null || $name !== null,
+      $instrumentation !== NULL || $name !== NULL,
       'Either instrumentation or name must be provided'
     );
 
-    if ($instrumentation !== null) {
+    if ($instrumentation !== NULL) {
       assert(method_exists($instrumentation, 'tracer'), 'Instrumentation must implement tracer() method');
     }
 
@@ -57,8 +60,8 @@ trait InstrumentationTrait {
         SpanKind::KIND_CLIENT,
         SpanKind::KIND_SERVER,
         SpanKind::KIND_PRODUCER,
-        SpanKind::KIND_CONSUMER
-      ], true),
+        SpanKind::KIND_CONSUMER,
+      ], TRUE),
       'Invalid span kind provided'
     );
     static::$instrumentation = $instrumentation ?? new CachedInstrumentation($name);
@@ -85,19 +88,22 @@ trait InstrumentationTrait {
    * @throws \RuntimeException
    */
   protected static function getInstrumentation() {
-    if (static::$instrumentation === null) {
+    if (static::$instrumentation === NULL) {
       throw new \RuntimeException('Instrumentation not initialized. Call initialize() first.');
     }
     return static::$instrumentation;
   }
 
+  /**
+   *
+   */
   protected static function helperHook(
     string $className,
     string $methodName,
     array $paramMap = [],
-    ?string $returnValueKey = null,
-    ?callable $preHandler = null,
-    ?callable $postHandler = null
+    ?string $returnValueKey = NULL,
+    ?callable $preHandler = NULL,
+    ?callable $postHandler = NULL,
   ): void {
     $resolvedParamMap = static::resolveParamPositions($className, $methodName, $paramMap);
     static::registerHook(
@@ -108,10 +114,13 @@ trait InstrumentationTrait {
     );
   }
 
+  /**
+   *
+   */
   protected static function preHook(
     string $operation,
     array $resolvedParamMap = [],
-    ?callable $customHandler = null
+    ?callable $customHandler = NULL,
   ): callable {
     return static function (
       $object,
@@ -119,11 +128,11 @@ trait InstrumentationTrait {
       string $class,
       string $function,
       ?string $filename,
-      ?int $lineno
+      ?int $lineno,
     ) use ($operation, $resolvedParamMap, $customHandler): void {
       $parent = static::getCurrentContext();
 
-      /** @var CachedInstrumentation $instrumentation */
+      /** @var \OpenTelemetry\API\Instrumentation\CachedInstrumentation $instrumentation */
       $instrumentation = static::getInstrumentation();
 
       $spanBuilder = $instrumentation->tracer()->spanBuilder("$class::$function")
@@ -146,7 +155,7 @@ trait InstrumentationTrait {
         }
       }
 
-      if ($customHandler !== null) {
+      if ($customHandler !== NULL) {
         $customHandler($spanBuilder, $object, $params, $class, $function, $filename, $lineno);
       }
 
@@ -155,16 +164,19 @@ trait InstrumentationTrait {
     };
   }
 
+  /**
+   *
+   */
   protected static function postHook(
     string $operation,
-    ?string $resultAttribute = null,
-    ?callable $customHandler = null
+    ?string $resultAttribute = NULL,
+    ?callable $customHandler = NULL,
   ): callable {
     return static function (
       $object,
       array $params,
       $returnValue,
-      ?Throwable $exception
+      ?\Throwable $exception,
     ) use ($resultAttribute, $customHandler): void {
       $scope = static::getContextStorage()->scope();
       if (!$scope) {
@@ -173,7 +185,7 @@ trait InstrumentationTrait {
 
       $span = static::getSpanFromContext($scope->context());
 
-      if ($resultAttribute !== null) {
+      if ($resultAttribute !== NULL) {
         $span->setAttribute(
           static::getAttributeName($resultAttribute),
           is_scalar($returnValue) ? $returnValue : json_encode($returnValue)
@@ -185,7 +197,7 @@ trait InstrumentationTrait {
         $span->setStatus(StatusCode::STATUS_ERROR, $exception->getMessage());
       }
 
-      if ($customHandler !== null) {
+      if ($customHandler !== NULL) {
         $customHandler($span, $object, $params, $returnValue, $exception);
       }
 
@@ -194,16 +206,19 @@ trait InstrumentationTrait {
     };
   }
 
+  /**
+   *
+   */
   protected static function resolveParamPositions(
     string $className,
     string $methodName,
-    array $paramMap
+    array $paramMap,
   ): array {
     if (empty($paramMap)) {
       return [];
     }
 
-    $reflection = new ReflectionMethod($className, $methodName);
+    $reflection = new \ReflectionMethod($className, $methodName);
     $parameters = $reflection->getParameters();
     $resolvedMap = [];
     foreach ($paramMap as $key => $value) {
@@ -226,7 +241,7 @@ trait InstrumentationTrait {
     string $className,
     string $methodName,
     callable $pre,
-    callable $post
+    callable $post,
   ): void {
     hook($className, $methodName, pre: $pre, post: $post);
   }
@@ -252,6 +267,5 @@ trait InstrumentationTrait {
   protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
     return Span::fromContext($context);
   }
-
 
 }

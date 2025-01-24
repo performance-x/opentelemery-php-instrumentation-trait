@@ -14,24 +14,34 @@ class TestCachedInstrumentation {
   private TracerInterface $tracer;
 
   /**
-   * @param string $name Required by CachedInstrumentation interface
+   * @param string $name
+   *   Required by CachedInstrumentation interface.
    */
   public function __construct(
-    /** @phpstan-ignore-next-line */
+    /**
+     * @phpstan-ignore-next-line */
     private readonly string $name,
-    /** @phpstan-ignore-next-line */
-    private readonly ?string $version = null,
-    /** @phpstan-ignore-next-line */
-    private readonly ?string $schemaUrl = null,
-    /** @phpstan-ignore-next-line */
+    /**
+     * @phpstan-ignore-next-line */
+    private readonly ?string $version = NULL,
+    /**
+     * @phpstan-ignore-next-line */
+    private readonly ?string $schemaUrl = NULL,
+    /**
+     * @phpstan-ignore-next-line */
     private readonly iterable $attributes = [],
-
   ) {}
 
+  /**
+   *
+   */
   public function setTracer(TracerInterface $tracer): void {
     $this->tracer = $tracer;
   }
 
+  /**
+   *
+   */
   public function tracer(): TracerInterface {
     return $this->tracer;
   }
@@ -56,4 +66,5 @@ class TestCachedInstrumentation {
   public function eventLogger(): EventLoggerInterface {
     throw new \RuntimeException('Not implemented in test class');
   }
+
 }
