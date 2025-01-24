@@ -47,9 +47,11 @@ trait InstrumentationTrait {
   }
 
   protected static function getAttributeName(string $name): string {
-    return static::$attributePrefix !== null
-      ? static::$attributePrefix . '.' . $name
-      : $name;
+    if (empty(static::$attributePrefix)) {
+      return $name;
+    }
+
+    return static::$attributePrefix . '.' . $name;
   }
 
   protected static function getInstrumentation() {
