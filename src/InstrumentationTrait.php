@@ -232,10 +232,10 @@ trait InstrumentationTrait {
   }
 
   /**
-   * @param \OpenTelemetry\Context\Context $context
+   * @param \OpenTelemetry\Context\ContextInterface $context
    * @return \OpenTelemetry\API\Trace\SpanInterface
    */
-  protected static function getSpanFromContext(Context $context) {
+  protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
     return Span::fromContext($context);
   }
 
