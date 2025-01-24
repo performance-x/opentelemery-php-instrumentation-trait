@@ -2,32 +2,58 @@
 
 namespace PerformanceX\OpenTelemetry\Instrumentation\Tests;
 
+use OpenTelemetry\API\Trace\NonRecordingSpan;
 use OpenTelemetry\API\Trace\SpanInterface;
 use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\API\Trace\TracerInterface;
 use OpenTelemetry\API\Trace\SpanBuilderInterface;
 use OpenTelemetry\Context\ContextInterface;
-use OpenTelemetry\Context\ContextStorageInterface;
-use OpenTelemetry\Context\ContextStorageScopeInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
 use PHPUnit\Framework\TestCase;
 use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
 
+/**
+ *
+ */
 interface TestTargetInterface {
+
+  /**
+   *
+   */
   public function testMethod(string $param1, array $param2): string;
+
+  /**
+   *
+   */
   public function throwingMethod(): void;
+
 }
 
+/**
+ *
+ */
 class TestTarget implements TestTargetInterface {
+
+  /**
+   *
+   */
   public function testMethod(string $param1, array $param2): string {
     return 'test-' . $param1;
   }
+
+  /**
+   *
+   */
   public function throwingMethod(): void {
     throw new \RuntimeException('Test exception');
   }
+
 }
 
+/**
+ *
+ */
 class TestInstrumentation {
   use InstrumentationTrait {
     initialize as public;
@@ -47,6 +73,9 @@ class TestInstrumentation {
   protected static ?\Throwable $testException = NULL;
   protected static ?SpanInterface $testSpan = NULL;
 
+  /**
+   *
+   */
   public static function setTestParameters(string $methodName, array $params): void {
     static::$testParameters[$methodName] = $params;
   }
@@ -58,18 +87,30 @@ class TestInstrumentation {
     static::$testReturnValues[$methodName] = $value;
   }
 
+  /**
+   *
+   */
   public static function setTestException(\Throwable $exception): void {
     static::$testException = $exception;
   }
 
+  /**
+   *
+   */
   public static function setTestSpan(SpanInterface $span): void {
     static::$testSpan = $span;
   }
 
+  /**
+   *
+   */
   public static function resetInstrumentation(): void {
     static::$instrumentation = NULL;
   }
 
+  /**
+   *
+   */
   protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
     if (static::$testSpan === NULL) {
       throw new \RuntimeException('Test span not initialized. Call setTestSpan() first.');
@@ -78,6 +119,9 @@ class TestInstrumentation {
     return static::$testSpan;
   }
 
+  /**
+   *
+   */
   protected static function registerHook(
     string $className,
     string $methodName,
@@ -94,12 +138,16 @@ class TestInstrumentation {
 
     if ($methodName === 'throwingMethod' && static::$testException) {
       $post($target, $params, NULL, static::$testException);
-    } else {
+    }
+    else {
       $returnValue = static::$testReturnValues[$methodName] ?? 'test-result';
       $post($target, $params, $returnValue, NULL);
     }
   }
 
+  /**
+   *
+   */
   public static function register(): void {
     static::initialize(
       name: 'io.opentelemetry.contrib.php.test',
@@ -134,6 +182,9 @@ class InstrumentationTraitTest extends TestCase {
 
   private TestCachedInstrumentation $testInstrumentation;
 
+  /**
+   *
+   */
   protected function setUp(): void {
     parent::setUp();
 
@@ -644,9 +695,9 @@ class InstrumentationTraitTest extends TestCase {
 
     $context = $this->createMock(ContextInterface::class);
 
-    // This should work as expected
+    // This should work as expected.
     $span = TestInstrumentation::traitGetSpanFromContext($context);
-    $this->assertInstanceOf(\OpenTelemetry\API\Trace\NonRecordingSpan::class, $span);
+    $this->assertInstanceOf(NonRecordingSpan::class, $span);
   }
 
   /**
@@ -661,15 +712,16 @@ class InstrumentationTraitTest extends TestCase {
 
     $post = TestInstrumentation::postHook('test.operation');
 
-    // Call postHook with some test data
+    // Call postHook with some test data.
     $post(
       new TestTarget(),
       [],
       'test-result',
-      null
+      NULL
     );
 
-    // No assertion needed as we're testing that no exception is thrown
+    // No assertion needed as we're testing that no exception is thrown.
     $this->addToAssertionCount(1);
   }
+
 }

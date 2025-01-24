@@ -235,6 +235,7 @@ trait InstrumentationTrait {
 
   /**
    * Protected method to allow override of hook registration in tests.
+   *
    * @codeCoverageIgnore
    */
   protected static function registerHook(
