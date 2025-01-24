@@ -2,6 +2,7 @@
 
 namespace PerformanceX\OpenTelemetry\Instrumentation\Tests;
 
+use OpenTelemetry\API\Trace\NonRecordingSpan;
 use OpenTelemetry\API\Trace\SpanInterface;
 use OpenTelemetry\API\Trace\SpanKind;
 use OpenTelemetry\API\Trace\StatusCode;
@@ -13,7 +14,7 @@ use PHPUnit\Framework\TestCase;
 use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
 
 /**
- * Test target interface.
+ *
  */
 interface TestTargetInterface {
 
@@ -30,7 +31,7 @@ interface TestTargetInterface {
 }
 
 /**
- * Test target implementation.
+ *
  */
 class TestTarget implements TestTargetInterface {
 
@@ -58,13 +59,16 @@ class TestInstrumentation {
     initialize as public;
     getInstrumentation as public;
     helperHook as public;
+    postHook as public;
+    getSpanFromContext as public traitGetSpanFromContext;
   }
 
   protected const CLASSNAME = TestTargetInterface::class;
 
   protected static array $testParameters = [];
   /**
-   * @var array<string, mixed> */
+   * @var array<string, mixed>
+   */
   protected static array $testReturnValues = [];
   protected static ?\Throwable $testException = NULL;
   protected static ?SpanInterface $testSpan = NULL;
@@ -100,6 +104,13 @@ class TestInstrumentation {
   /**
    *
    */
+  public static function resetInstrumentation(): void {
+    static::$instrumentation = NULL;
+  }
+
+  /**
+   *
+   */
   protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
     if (static::$testSpan === NULL) {
       throw new \RuntimeException('Test span not initialized. Call setTestSpan() first.');
@@ -126,8 +137,7 @@ class TestInstrumentation {
     $pre($target, $params, $className, $methodName, $file, $line);
 
     if ($methodName === 'throwingMethod' && static::$testException) {
-      $exception = static::$testException;
-      $post($target, $params, NULL, $exception);
+      $post($target, $params, NULL, static::$testException);
     }
     else {
       $returnValue = static::$testReturnValues[$methodName] ?? 'test-result';
@@ -143,38 +153,31 @@ class TestInstrumentation {
       name: 'io.opentelemetry.contrib.php.test',
       prefix: 'test'
     );
-
-    static::helperHook(
-      self::CLASSNAME,
-      'testMethod',
-      ['param1', 'param2'],
-      'returnValue'
-    );
-
-    static::helperHook(
-      self::CLASSNAME,
-      'throwingMethod',
-      [],
-      'returnValue'
-    );
+    static::helperHook(self::CLASSNAME, 'testMethod', ['param1', 'param2'], 'returnValue');
+    static::helperHook(self::CLASSNAME, 'throwingMethod', [], 'returnValue');
   }
 
 }
 
 /**
  * Tests for the InstrumentationTrait.
+ *
+ * @coversDefaultClass \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait
  */
 class InstrumentationTraitTest extends TestCase {
   /**
-   * @var \OpenTelemetry\API\Trace\SpanInterface&\PHPUnit\Framework\MockObject\MockObject */
+   * @var \OpenTelemetry\API\Trace\SpanInterface&\PHPUnit\Framework\MockObject\MockObject
+   */
   private SpanInterface $mockSpan;
 
   /**
-   * @var \OpenTelemetry\API\Trace\SpanBuilderInterface&\PHPUnit\Framework\MockObject\MockObject */
+   * @var \OpenTelemetry\API\Trace\SpanBuilderInterface&\PHPUnit\Framework\MockObject\MockObject
+   */
   private SpanBuilderInterface $mockSpanBuilder;
 
   /**
-   * @var \OpenTelemetry\API\Trace\TracerInterface&\PHPUnit\Framework\MockObject\MockObject */
+   * @var \OpenTelemetry\API\Trace\TracerInterface&\PHPUnit\Framework\MockObject\MockObject
+   */
   private TracerInterface $mockTracer;
 
   private TestCachedInstrumentation $testInstrumentation;
@@ -206,24 +209,25 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::getInstrumentation
+   * @covers ::initialize
+   * @covers ::getInstrumentation
    */
   public function testInitialization(): void {
-    TestInstrumentation::initialize(
-      instrumentation: $this->testInstrumentation
-    );
-
-    $this->assertSame(
-      $this->testInstrumentation,
-      TestInstrumentation::getInstrumentation()
-    );
+    TestInstrumentation::initialize(instrumentation: $this->testInstrumentation);
+    $this->assertSame($this->testInstrumentation, TestInstrumentation::getInstrumentation());
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testParameterMapping(): void {
     TestInstrumentation::initialize(
@@ -257,9 +261,16 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testCustomHandlers(): void {
     TestInstrumentation::initialize(
@@ -290,8 +301,16 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::preHook
+   * @covers ::resolveParamPositions
    */
   public function testExceptionHandling(): void {
     TestInstrumentation::initialize(
@@ -322,8 +341,16 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::preHook
+   * @covers ::resolveParamPositions
    */
   public function testReturnValueHandling(): void {
     TestInstrumentation::initialize(
@@ -353,9 +380,15 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testSpanKindConfiguration(): void {
     TestInstrumentation::initialize(
@@ -375,9 +408,15 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::getAttributeName
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testAttributePrefix(): void {
     TestInstrumentation::initialize(
@@ -403,7 +442,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
+   * @covers ::initialize
    */
   public function testInitializationValidation(): void {
     $this->expectException(\RuntimeException::class);
@@ -413,8 +452,16 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::preHook
+   * @covers ::resolveParamPositions
    */
   public function testArrayParameterHandling(): void {
     TestInstrumentation::initialize(
@@ -446,8 +493,16 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::preHook
+   * @covers ::resolveParamPositions
    */
   public function testComplexReturnValueHandling(): void {
     TestInstrumentation::initialize(
@@ -473,8 +528,15 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testMultipleParameterMapping(): void {
     TestInstrumentation::initialize(
@@ -507,8 +569,15 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testNonExistentParameterMapping(): void {
     TestInstrumentation::initialize(
@@ -534,8 +603,16 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::preHook
+   * @covers ::resolveParamPositions
    */
   public function testNestedExceptionHandling(): void {
     TestInstrumentation::initialize(
@@ -562,7 +639,16 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
-   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
    */
   public function testEmptyPrefixBehavior(): void {
     TestInstrumentation::initialize(
@@ -585,6 +671,57 @@ class InstrumentationTraitTest extends TestCase {
       'testMethod',
       []
     );
+  }
+
+  /**
+   * @covers ::getInstrumentation
+   */
+  public function testUninitializedInstrumentation(): void {
+    TestInstrumentation::resetInstrumentation();
+
+    $this->expectException(\RuntimeException::class);
+    $this->expectExceptionMessage('Instrumentation not initialized. Call initialize() first.');
+    TestInstrumentation::getInstrumentation();
+  }
+
+  /**
+   * @covers ::initialize
+   * @covers ::getSpanFromContext
+   */
+  public function testGetSpanFromContext(): void {
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation
+    );
+
+    $context = $this->createMock(ContextInterface::class);
+
+    // This should work as expected.
+    $span = TestInstrumentation::traitGetSpanFromContext($context);
+    $this->assertInstanceOf(NonRecordingSpan::class, $span);
+  }
+
+  /**
+   * @covers ::initialize
+   * @covers ::getContextStorage
+   * @covers ::postHook
+   */
+  public function testPostHookWithoutScope(): void {
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation
+    );
+
+    $post = TestInstrumentation::postHook('test.operation');
+
+    // Call postHook with some test data.
+    $post(
+      new TestTarget(),
+      [],
+      'test-result',
+      NULL
+    );
+
+    // No assertion needed as we're testing that no exception is thrown.
+    $this->addToAssertionCount(1);
   }
 
 }

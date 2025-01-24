@@ -235,6 +235,8 @@ trait InstrumentationTrait {
 
   /**
    * Protected method to allow override of hook registration in tests.
+   *
+   * @codeCoverageIgnore
    */
   protected static function registerHook(
     string $className,
@@ -261,9 +263,9 @@ trait InstrumentationTrait {
 
   /**
    * @param \OpenTelemetry\Context\ContextInterface $context
-   * @return \OpenTelemetry\API\Trace\SpanInterface
+   * @return \OpenTelemetry\API\Trace\SpanInterface|\OpenTelemetry\API\Trace\NonRecordingSpan
    */
-  protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
+  protected static function getSpanFromContext(ContextInterface $context): object {
     return Span::fromContext($context);
   }
 

@@ -321,7 +321,7 @@ try {
 
 ## Requirements
 
-- PHP 8.0+
+- PHP 8.1+
 - OpenTelemetry PHP SDK
 
 ## License
