@@ -8,6 +8,8 @@ use OpenTelemetry\API\Trace\StatusCode;
 use OpenTelemetry\API\Trace\TracerInterface;
 use OpenTelemetry\API\Trace\SpanBuilderInterface;
 use OpenTelemetry\Context\ContextInterface;
+use OpenTelemetry\Context\ContextStorageInterface;
+use OpenTelemetry\Context\ContextStorageScopeInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
 use PHPUnit\Framework\TestCase;
 use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
@@ -31,6 +33,7 @@ class TestInstrumentation {
     initialize as public;
     getInstrumentation as public;
     helperHook as public;
+    postHook as public;
     getSpanFromContext as public traitGetSpanFromContext;
   }
 
@@ -646,4 +649,27 @@ class InstrumentationTraitTest extends TestCase {
     $this->assertInstanceOf(\OpenTelemetry\API\Trace\NonRecordingSpan::class, $span);
   }
 
+  /**
+   * @covers ::initialize
+   * @covers ::getContextStorage
+   * @covers ::postHook
+   */
+  public function testPostHookWithoutScope(): void {
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation
+    );
+
+    $post = TestInstrumentation::postHook('test.operation');
+
+    // Call postHook with some test data
+    $post(
+      new TestTarget(),
+      [],
+      'test-result',
+      null
+    );
+
+    // No assertion needed as we're testing that no exception is thrown
+    $this->addToAssertionCount(1);
+  }
 }
