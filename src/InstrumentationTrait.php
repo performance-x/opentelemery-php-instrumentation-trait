@@ -89,7 +89,7 @@ trait InstrumentationTrait {
       ?string $filename,
       ?int $lineno
     ) use ($operation, $resolvedParamMap, $customHandler): void {
-      $parent = Context::getCurrent();
+      $parent = static::getCurrentContext();
       $spanBuilder = static::getInstrumentation()->tracer()->spanBuilder("$class::$function")
         ->setParent($parent)
         ->setSpanKind(static::$spanKind)
@@ -115,7 +115,7 @@ trait InstrumentationTrait {
       }
 
       $span = $spanBuilder->startSpan();
-      Context::storage()->attach($span->storeInContext($parent));
+      static::getContextStorage()->attach($span->storeInContext($parent));
     };
   }
 
@@ -130,12 +130,12 @@ trait InstrumentationTrait {
       $returnValue,
       ?Throwable $exception
     ) use ($operation, $resultAttribute, $customHandler): void {
-      $scope = Context::storage()->scope();
+      $scope = static::getContextStorage()->scope();
       if (!$scope) {
         return;
       }
 
-      $span = Span::fromContext($scope->context());
+      $span = static::getSpanFromContext($scope->context());
 
       if ($resultAttribute !== null) {
         $span->setAttribute(
@@ -194,4 +194,27 @@ trait InstrumentationTrait {
   ): void {
     hook($className, $methodName, pre: $pre, post: $post);
   }
+
+  /**
+   * Protected method to allow override of Context::getCurrent() in tests. 
+   */
+  protected static function getCurrentContext() {
+    return Context::getCurrent();
+  }
+
+  /**
+   * Protected method to allow override of Context::storage() in tests.
+   */
+  protected static function getContextStorage() {
+    return Context::storage();
+  }
+
+  /**
+   * Protected method to allow override of Span::fromContext() in tests.
+   */
+  protected static function getSpanFromContext($context) {
+    return Span::fromContext($context);
+  }
+
+
 }
