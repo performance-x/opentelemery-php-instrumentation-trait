@@ -75,25 +75,26 @@ class TestInstrumentation {
   protected const CLASSNAME = TestTargetInterface::class;
 
   protected static array $testParameters = [];
-  private static Context $testContext;
-  private static $testContextStorage;
-  private static $testSpan;
+  protected static $testReturnValues = [];
+  protected static $testException = null;
+  protected static $testSpan;
 
   public static function setTestParameters(string $methodName, array $params): void {
     static::$testParameters[$methodName] = $params;
   }
 
-  public static function setTestContext(Context $context): void {
-    static::$testContext = $context;
+  public static function setTestReturnValue(string $methodName, $value): void {
+    static::$testReturnValues[$methodName] = $value;
   }
 
-  public static function setTestContextStorage($storage): void {
-    static::$testContextStorage = $storage;
+  public static function setTestException(\Throwable $exception): void {
+    static::$testException = $exception;
   }
 
   public static function setTestSpan($span): void {
     static::$testSpan = $span;
   }
+
 
   protected static function getSpanFromContext($context) {
     return static::$testSpan;
@@ -113,11 +114,12 @@ class TestInstrumentation {
     
     $pre($target, $params, $className, $methodName, $file, $line);
     
-    if ($methodName === 'throwingMethod') {
-      $exception = new \RuntimeException('Test exception');
+    if ($methodName === 'throwingMethod' && static::$testException) {
+      $exception = static::$testException;
       $post($target, $params, null, $exception);
     } else {
-      $post($target, $params, 'test-result', null);
+      $returnValue = static::$testReturnValues[$methodName] ?? 'test-result';
+      $post($target, $params, $returnValue, null);
     }
   }
   
@@ -288,6 +290,9 @@ protected function setUp(): void {
       ->method('setStatus')
       ->with(StatusCode::STATUS_ERROR, 'Test exception');
     
+    $exception = new \RuntimeException('Test exception');
+    TestInstrumentation::setTestException($exception);
+
     TestInstrumentation::helperHook(
       TestTargetInterface::class,
       'throwingMethod',
@@ -381,5 +386,180 @@ protected function setUp(): void {
     $this->expectExceptionMessage('Either instrumentation or name must be provided');
     
     TestInstrumentation::initialize();
+  }
+
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   */
+  public function testArrayParameterHandling(): void {
+      TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation,
+      prefix: 'test'
+    );
+
+    TestInstrumentation::setTestParameters('testMethod', [
+      0 => 'param1',
+      1 => ['nested' => ['value' => 'test']]
+    ]);
+
+    $this->mockSpanBuilder->expects($this->exactly(6))
+      ->method('setAttribute')
+      ->withConsecutive(
+        [TraceAttributes::CODE_FUNCTION, 'testMethod'],
+        [TraceAttributes::CODE_NAMESPACE, TestTargetInterface::class],
+        [TraceAttributes::CODE_FILEPATH, '/test/file.php'],
+        [TraceAttributes::CODE_LINENO, 42],
+        ['test.operation', TestTargetInterface::class . '::testMethod'],
+        ['test.param2', '{"nested":{"value":"test"}}']
+      );
+
+    TestInstrumentation::helperHook(
+      TestTargetInterface::class,
+      'testMethod',
+      ['param2' => 'param2']
+    );
+  }
+
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   */
+  public function testComplexReturnValueHandling(): void {
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation,
+      prefix: 'test'
+    );
+
+    // Need to modify registerHook in TestInstrumentation to use this value
+    $complexReturn = ['status' => true, 'data' => ['key' => 'value']];
+    TestInstrumentation::setTestParameters('testMethod', []);
+    TestInstrumentation::setTestReturnValue('testMethod', $complexReturn);
+
+    $this->mockSpan->expects($this->once())
+      ->method('setAttribute')
+      ->with('test.result', '{"status":true,"data":{"key":"value"}}');
+
+    TestInstrumentation::helperHook(
+      TestTargetInterface::class,
+      'testMethod',
+      [],
+      'result'
+    );
+  }
+
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   */
+  public function testMultipleParameterMapping(): void {
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation,
+      prefix: 'test'
+    );
+
+    TestInstrumentation::setTestParameters('testMethod', [
+      0 => 'value1',
+      1 => ['key' => 'value']
+    ]);
+
+    $this->mockSpanBuilder->expects($this->exactly(7))
+      ->method('setAttribute')
+      ->withConsecutive(
+        [TraceAttributes::CODE_FUNCTION, 'testMethod'],
+        [TraceAttributes::CODE_NAMESPACE, TestTargetInterface::class],
+        [TraceAttributes::CODE_FILEPATH, '/test/file.php'],
+        [TraceAttributes::CODE_LINENO, 42],
+        ['test.operation', TestTargetInterface::class . '::testMethod'],
+        ['test.first', 'value1'],
+        ['test.second', '{"key":"value"}']
+      );
+
+    TestInstrumentation::helperHook(
+      TestTargetInterface::class,
+      'testMethod',
+      ['param1' => 'first', 'param2' => 'second']
+    );
+  }
+
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   */
+  public function testNonExistentParameterMapping(): void {
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation,
+      prefix: 'test'
+    );
+
+    $this->mockSpanBuilder->expects($this->exactly(5))
+      ->method('setAttribute')
+      ->withConsecutive(
+        [TraceAttributes::CODE_FUNCTION, 'testMethod'],
+        [TraceAttributes::CODE_NAMESPACE, TestTargetInterface::class],
+        [TraceAttributes::CODE_FILEPATH, '/test/file.php'],
+        [TraceAttributes::CODE_LINENO, 42],
+        ['test.operation', TestTargetInterface::class . '::testMethod']
+      );
+
+    TestInstrumentation::helperHook(
+      TestTargetInterface::class,
+      'testMethod',
+      ['nonexistent' => 'value']
+    );
+  }
+
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   */
+  public function testNestedExceptionHandling(): void {
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation
+    );
+
+    $nestedException = new \RuntimeException(
+      'Nested exception',
+      0,
+      new \Exception('Original error')
+    );
+
+    TestInstrumentation::setTestException($nestedException);
+
+    $this->mockSpan->expects($this->once())
+      ->method('recordException')
+      ->with($nestedException);
+
+    TestInstrumentation::helperHook(
+      TestTargetInterface::class,
+      'throwingMethod',
+      []
+    );
+  }
+
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
+   */
+  public function testEmptyPrefixBehavior(): void {
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation,
+      prefix: ''
+    );
+
+    $this->mockSpanBuilder->expects($this->exactly(5))
+      ->method('setAttribute')
+      ->withConsecutive(
+        [TraceAttributes::CODE_FUNCTION, 'testMethod'],
+        [TraceAttributes::CODE_NAMESPACE, TestTargetInterface::class],
+        [TraceAttributes::CODE_FILEPATH, '/test/file.php'],
+        [TraceAttributes::CODE_LINENO, 42],
+        ['operation', TestTargetInterface::class . '::testMethod']
+      );
+
+    TestInstrumentation::helperHook(
+      TestTargetInterface::class,
+      'testMethod',
+      []
+    );
   }
 }
