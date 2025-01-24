@@ -159,6 +159,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
    * @covers ::postHook
@@ -201,6 +202,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
    * @covers ::postHook
@@ -240,6 +242,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::initialize
    * @covers ::helperHook
    * @covers ::postHook
    * @covers ::getSpanFromContext
@@ -279,6 +282,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::initialize
    * @covers ::helperHook
    * @covers ::postHook
    * @covers ::getSpanFromContext
@@ -320,6 +324,7 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
+   * @covers ::postHook
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
@@ -344,8 +349,10 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
+   * @covers ::postHook
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
@@ -386,6 +393,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::initialize
    * @covers ::helperHook
    * @covers ::postHook
    * @covers ::getSpanFromContext
@@ -426,6 +434,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::initialize
    * @covers ::helperHook
    * @covers ::postHook
    * @covers ::getSpanFromContext
@@ -460,8 +469,10 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
+   * @covers ::postHook
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
@@ -499,8 +510,10 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
+   * @covers ::postHook
    * @covers ::getAttributeName
    * @covers ::getContextStorage
    * @covers ::getCurrentContext
@@ -531,6 +544,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::initialize
    * @covers ::helperHook
    * @covers ::postHook
    * @covers ::getSpanFromContext
