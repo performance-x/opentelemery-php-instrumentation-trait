@@ -45,10 +45,9 @@ trait InstrumentationTrait {
     ?int $spanKind = SpanKind::KIND_INTERNAL,
     ?string $name = NULL,
   ): void {
-    assert(
-      $instrumentation !== NULL || $name !== NULL,
-      'Either instrumentation or name must be provided'
-    );
+    if ($instrumentation === NULL && empty($name)) {
+      throw new \RuntimeException('Either instrumentation or a non-empty name must be provided');
+    }
 
     if ($instrumentation !== NULL) {
       assert(method_exists($instrumentation, 'tracer'), 'Instrumentation must implement tracer() method');
