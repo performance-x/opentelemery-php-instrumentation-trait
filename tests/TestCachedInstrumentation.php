@@ -12,7 +12,7 @@ use OpenTelemetry\API\Logs\EventLoggerInterface;
  */
 class TestCachedInstrumentation {
   private TracerInterface $tracer;
-  
+
   public function __construct(
     private readonly string $name,
     private readonly ?string $version = null,

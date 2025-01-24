@@ -198,7 +198,7 @@ trait InstrumentationTrait {
   }
 
   /**
-   * Protected method to allow override of Context::getCurrent() in tests. 
+   * Protected method to allow override of Context::getCurrent() in tests.
    */
   protected static function getCurrentContext() {
     return Context::getCurrent();
