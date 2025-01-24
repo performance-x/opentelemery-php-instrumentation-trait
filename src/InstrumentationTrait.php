@@ -13,7 +13,7 @@ use ReflectionMethod;
 use Throwable;
 
 trait InstrumentationTrait {
-  protected static ?CachedInstrumentation $instrumentation = null;
+  protected static $instrumentation = null;
   protected static ?string $attributePrefix = null;
   protected static int $spanKind = SpanKind::KIND_INTERNAL;
 
@@ -33,7 +33,7 @@ trait InstrumentationTrait {
    *   When neither instrumentation nor name is provided.
    */
   protected static function initialize(
-    ?CachedInstrumentation $instrumentation = null,
+    $instrumentation = null,
     ?string $prefix = null,
     ?int $spanKind = SpanKind::KIND_INTERNAL,
     ?string $name = null,
@@ -52,7 +52,7 @@ trait InstrumentationTrait {
       : $name;
   }
 
-  protected static function getInstrumentation(): CachedInstrumentation {
+  protected static function getInstrumentation() {
     if (static::$instrumentation === null) {
       throw new \RuntimeException('Instrumentation not initialized. Call initialize() first.');
     }
