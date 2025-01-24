@@ -78,6 +78,18 @@ class TestInstrumentation {
   protected const CLASSNAME = TestTargetInterface::class;
 
   /**
+   * Store test parameters per method.
+   */
+  protected static array $testParameters = [];
+
+  /**
+   * Set test parameters for a method.
+   */
+  public static function setTestParameters(string $methodName, array $params): void {
+    static::$testParameters[$methodName] = $params;
+  }
+
+  /**
    * Override hook registration for testing.
    */
   protected static function registerHook(
@@ -87,15 +99,23 @@ class TestInstrumentation {
     callable $post
   ): void {
     $target = new TestTarget();
-    $pre($target, [], $className, $methodName, __FILE__, __LINE__);
+    // Use consistent values for file and line
+    $file = '/test/file.php';
+    $line = 42;
+
+    // Use configured test parameters or empty array
+    $params = static::$testParameters[$methodName] ?? [];
+
+    $pre($target, $params, $className, $methodName, $file, $line);
     
     try {
       if ($methodName === 'throwingMethod') {
         $exception = new \RuntimeException('Test exception');
-        $post($target, [], null, $exception);
+        $post($target, $params, null, $exception);
       }
       else {
-        $post($target, [], 'test-result', null);
+        $returnValue = 'test-result';
+        $post($target, $params, $returnValue, null);
       }
     }
     catch (\Throwable $e) {
@@ -137,50 +157,74 @@ class InstrumentationTraitTest extends TestCase {
   
   protected function setUp(): void {
     parent::setUp();
-    
-    // Mock span
+
+    // Mock span with specific expectations for exception handling
     $this->mockSpan = $this->createMock(SpanInterface::class);
-    
+    $this->mockSpan->method('recordException')->willReturnSelf();
+    $this->mockSpan->method('setStatus')->willReturnSelf();
+
     // Mock span builder
     $this->mockSpanBuilder = $this->createMock(SpanBuilderInterface::class);
     $this->mockSpanBuilder->method('setParent')->willReturnSelf();
     $this->mockSpanBuilder->method('setSpanKind')->willReturnSelf();
     $this->mockSpanBuilder->method('setAttribute')->willReturnSelf();
     $this->mockSpanBuilder->method('startSpan')->willReturn($this->mockSpan);
-    
+
     // Mock tracer
     $this->mockTracer = $this->createMock(TracerInterface::class);
     $this->mockTracer->method('spanBuilder')->willReturn($this->mockSpanBuilder);
-    
+
     // Create test instrumentation
     $this->testInstrumentation = new TestCachedInstrumentation('test');
     $this->testInstrumentation->setTracer($this->mockTracer);
   }
-  
+
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::getInstrumentation
+   */
   public function testInitialization(): void {
     TestInstrumentation::initialize(
       instrumentation: $this->testInstrumentation
     );
-    
+
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::resolveParamPositions
+   */
     $this->assertSame(
       $this->testInstrumentation,
       TestInstrumentation::getInstrumentation()
     );
   }
-  
+ 
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   */ 
   public function testParameterMapping(): void {
     TestInstrumentation::initialize(
       instrumentation: $this->testInstrumentation,
       prefix: 'test'
     );
+
+    // Configure test parameters
+    TestInstrumentation::setTestParameters('testMethod', [
+      0 => 'param1',
+      1 => ['key' => 'value']
+    ]);
     
-    $this->mockSpanBuilder->expects($this->atLeast(4))
+    $this->mockSpanBuilder->expects($this->exactly(6))
       ->method('setAttribute')
       ->withConsecutive(
         [TraceAttributes::CODE_FUNCTION, 'testMethod'],
         [TraceAttributes::CODE_NAMESPACE, TestTargetInterface::class],
+        [TraceAttributes::CODE_FILEPATH, '/test/file.php'],
+        [TraceAttributes::CODE_LINENO, 42],
         ['test.operation', TestTargetInterface::class . '::testMethod'],
-        ['test.param1', 'value1']
+        ['test.param1', 'param1']
       );
     
     TestInstrumentation::helperHook(
@@ -191,6 +235,11 @@ class InstrumentationTraitTest extends TestCase {
     );
   }
   
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   */ 
   public function testCustomHandlers(): void {
     TestInstrumentation::initialize(
       instrumentation: $this->testInstrumentation,
@@ -218,16 +267,25 @@ class InstrumentationTraitTest extends TestCase {
     $this->assertTrue($preHandlerCalled, 'Pre-handler was not called');
     $this->assertTrue($postHandlerCalled, 'Post-handler was not called');
   }
-  
+ 
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   */ 
   public function testExceptionHandling(): void {
     TestInstrumentation::initialize(
       instrumentation: $this->testInstrumentation
     );
-    
+
     $this->mockSpan->expects($this->once())
       ->method('recordException')
-      ->with($this->isInstanceOf(\RuntimeException::class));
-      
+      ->with(
+        $this->callback(function($exception) {
+          return $exception instanceof \RuntimeException 
+            && $exception->getMessage() === 'Test exception';
+        })
+      );    
+
     $this->mockSpan->expects($this->once())
       ->method('setStatus')
       ->with(StatusCode::STATUS_ERROR, 'Test exception');
@@ -238,7 +296,40 @@ class InstrumentationTraitTest extends TestCase {
       []
     );
   }
-  
+
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::postHook
+   */
+  public function testReturnValueHandling(): void {
+    TestInstrumentation::initialize(
+      instrumentation: $this->testInstrumentation,
+      prefix: 'test'
+    );
+
+    // Configure test parameters and return value
+    TestInstrumentation::setTestParameters('testMethod', [
+      0 => 'param1',
+      1 => ['key' => 'value']
+    ]);
+
+    $this->mockSpan->expects($this->once())
+      ->method('setAttribute')
+      ->with('test.result', 'test-result');
+
+    TestInstrumentation::helperHook(
+      TestTargetInterface::class,
+      'testMethod',
+      [],
+      'result'  // Return value will be captured under this key
+    );
+  }
+ 
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   */ 
   public function testSpanKindConfiguration(): void {
     TestInstrumentation::initialize(
       instrumentation: $this->testInstrumentation,
@@ -255,24 +346,38 @@ class InstrumentationTraitTest extends TestCase {
       []
     );
   }
-  
+ 
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::helperHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::preHook
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::getAttributeName
+   */ 
   public function testAttributePrefix(): void {
     TestInstrumentation::initialize(
       instrumentation: $this->testInstrumentation,
       prefix: 'custom.prefix'
     );
-    
-    $this->mockSpanBuilder->expects($this->atLeastOnce())
-      ->method('setAttribute')
-      ->with('custom.prefix.operation', $this->anything());
-    
+
+      $this->mockSpanBuilder->expects($this->exactly(5))
+        ->method('setAttribute')
+        ->withConsecutive(
+          [TraceAttributes::CODE_FUNCTION, 'testMethod'],
+          [TraceAttributes::CODE_NAMESPACE, TestTargetInterface::class],
+          [TraceAttributes::CODE_FILEPATH, '/test/file.php'],
+          [TraceAttributes::CODE_LINENO, 42],
+          ['custom.prefix.operation', TestTargetInterface::class . '::testMethod']
+        );
+
     TestInstrumentation::helperHook(
       TestTargetInterface::class,
       'testMethod',
       []
     );
   }
-  
+
+  /**
+   * @covers \PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait::initialize
+   */ 
   public function testInitializationValidation(): void {
     $this->expectException(\RuntimeException::class);
     $this->expectExceptionMessage('Either instrumentation or name must be provided');
