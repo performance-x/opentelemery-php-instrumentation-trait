@@ -1,16 +1,45 @@
 <?xml version="1.0"?>
-<ruleset name="OpenTelemetry Instrumentation Trait coding standard">
-    <description>OpenTelemetry Instrumentation Trait coding standard</description>
+<ruleset name="OpenTelemetry Instrumentation">
+    <description>Coding standards for OpenTelemetry Instrumentation Trait</description>
 
-    <!-- display progress -->
-    <arg value="p"/>
-    <arg name="colors"/>
+    <!-- Use Drupal coding standards -->
+    <rule ref="Drupal"/>
+    <rule ref="DrupalPractice"/>
 
-    <!-- inherit rules from: -->
-    <rule ref="PSR12"/>
-    <rule ref="Generic.Arrays.DisallowLongArraySyntax"/>
-
-    <!-- Paths to check -->
+    <!-- Scan these files -->
     <file>src</file>
     <file>tests</file>
+
+    <!-- Use 's' to print the full error message -->
+    <arg value="s"/>
+    <arg name="colors"/>
+
+    <!-- Ignore specific folders -->
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+
+    <!-- Two spaces for indentation -->
+    <rule ref="Generic.WhiteSpace.ScopeIndent">
+        <properties>
+            <property name="indent" value="2"/>
+            <property name="tabIndent" value="false"/>
+        </properties>
+    </rule>
+
+    <!-- Line length -->
+    <rule ref="Drupal.Files.LineLength">
+        <properties>
+            <property name="lineLimit" value="100"/>
+            <property name="absoluteLineLimit" value="120"/>
+        </properties>
+    </rule>
+
+    <!-- Class/file naming -->
+    <rule ref="Drupal.NamingConventions.ValidClassName"/>
+
+    <!-- Ensure proper file doc blocks -->
+    <rule ref="Drupal.Commenting.FileComment"/>
+    <rule ref="Drupal.Commenting.DocComment"/>
+
+    <!-- PHP version compatibility -->
+    <config name="php_version" value="80000"/>
 </ruleset>
