@@ -7,8 +7,8 @@
     <rule ref="DrupalPractice"/>
 
     <!-- Scan these files -->
-    <file>./src</file>
-    <file>./tests</file>
+    <file>./src/</file>
+    <file>./tests/</file>
 
     <!-- PHP extensions to check -->
     <arg name="extensions" value="php"/>
@@ -19,9 +19,6 @@
     <!-- Use 's' to print the full error message -->
     <arg value="s"/>
     <arg name="colors"/>
-
-    <!-- Ignore specific folders -->
-    <exclude-pattern>*/vendor/*</exclude-pattern>
 
     <!-- Two spaces for indentation -->
     <rule ref="Generic.WhiteSpace.ScopeIndent">
