@@ -293,6 +293,8 @@ class InstrumentationTraitTest extends TestCase {
       1 => ['key' => 'value']
     ]);
 
+    TestInstrumentation::setTestReturnValue('testMethod', 'test-result');
+
     $this->mockSpan->expects($this->once())
       ->method('setAttribute')
       ->with('test.result', 'test-result');
