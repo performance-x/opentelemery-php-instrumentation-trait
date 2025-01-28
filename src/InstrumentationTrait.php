@@ -12,9 +12,6 @@ use OpenTelemetry\Context\ContextStorageInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
 use function OpenTelemetry\Instrumentation\hook;
 
-/**
- *
- */
 trait InstrumentationTrait {
   /**
    * @var object|null */
@@ -25,6 +22,21 @@ trait InstrumentationTrait {
   protected int $spanKind = SpanKind::KIND_INTERNAL;
   protected ?string $className = NULL;
 
+  /**
+   * Create new instrumentation with configuration options.
+   *
+   * @param object|null $instrumentation
+   *   Optional pre-configured instrumentation.
+   * @param string|null $prefix
+   *   Prefix for all span attributes.
+   * @param \OpenTelemetry\API\Trace\SpanKind::KIND_* $spanKind
+   *   Kind of spans to create (default: INTERNAL).
+   * @param string|null $name
+   *   Name of the instrumentation if no CachedInstrumentation provided.
+   *
+   * @throws \RuntimeException
+   *   When neither instrumentation nor name is provided.
+   */
   public static function create(
     string $name = NULL,
     ?string $prefix = NULL,
@@ -34,9 +46,12 @@ trait InstrumentationTrait {
   ): static {
     $instance = new static();
     $instance->className = $className;
-    $instance->initialize($instrumentation, $prefix, $spanKind, $name);
+    $instance->initialize(instrumentation: $instrumentation, prefix: $prefix, spanKind: $spanKind, name: $name);
     return $instance;
   }
+
+  // Final constructor, so we can use a factory method above.
+  final public function __construct() {}
 
   /**
    * Initialize the instrumentation with configuration options.

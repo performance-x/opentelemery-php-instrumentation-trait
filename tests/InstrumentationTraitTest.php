@@ -69,6 +69,18 @@ class TestInstrumentation {
 
   /**
    * Creates and initializes the instrumentation.
+   *
+   * @param object|null $instrumentation
+   *   Optional pre-configured instrumentation.
+   * @param string|null $prefix
+   *   Prefix for all span attributes.
+   * @param \OpenTelemetry\API\Trace\SpanKind::KIND_* $spanKind
+   *   Kind of spans to create (default: INTERNAL).
+   * @param string|null $name
+   *   Name of the instrumentation if no CachedInstrumentation provided.
+   *
+   * @throws \RuntimeException
+   *   When neither instrumentation nor name is provided.
    */
   public static function create(
     object $instrumentation = NULL,
@@ -79,7 +91,11 @@ class TestInstrumentation {
   ): static {
     $targetClass = $className ?? static::CLASSNAME;
     $instance = static::createClass(instrumentation: $instrumentation, prefix: $prefix, spanKind: $spanKind, className: $targetClass, name: $name);
-    $instance->setTestSpan(static::$initialTestSpan);
+
+    if (static::$initialTestSpan) {
+      $instance->setTestSpan(static::$initialTestSpan);
+    }
+
     return $instance;
   }
 
@@ -208,8 +224,6 @@ class InstrumentationTraitTest extends TestCase {
   private TracerInterface $mockTracer;
 
   private TestCachedInstrumentation $testInstrumentation;
-
-  public static $staticMockSpan = NULL;
 
   /**
    *
