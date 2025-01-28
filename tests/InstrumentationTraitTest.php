@@ -258,6 +258,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::getInstrumentation
@@ -268,6 +269,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -307,6 +309,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -347,6 +350,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -384,6 +388,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -418,6 +423,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -443,6 +449,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -476,6 +483,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    */
@@ -487,6 +495,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -525,6 +534,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -556,6 +566,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -596,6 +607,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -627,6 +639,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -660,6 +673,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
@@ -692,6 +706,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::getInstrumentation
@@ -706,6 +721,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::getSpanFromContext
@@ -723,6 +739,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::getContextStorage
@@ -748,6 +765,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::__construct
    * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
