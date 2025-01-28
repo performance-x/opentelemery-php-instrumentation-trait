@@ -18,11 +18,25 @@ use function OpenTelemetry\Instrumentation\hook;
 trait InstrumentationTrait {
   /**
    * @var object|null */
-  protected static $instrumentation = NULL;
-  protected static ?string $attributePrefix = NULL;
+  protected ?object $instrumentation = NULL;
+  protected ?string $attributePrefix = NULL;
   /**
    * @var \OpenTelemetry\API\Trace\SpanKind::KIND_* */
-  protected static int $spanKind = SpanKind::KIND_INTERNAL;
+  protected int $spanKind = SpanKind::KIND_INTERNAL;
+  protected ?string $className = NULL;
+
+  public static function create(
+    string $name = NULL,
+    ?string $prefix = NULL,
+    ?int $spanKind = SpanKind::KIND_INTERNAL,
+    ?object $instrumentation = NULL,
+    ?string $className = NULL
+  ): static {
+    $instance = new static();
+    $instance->className = $className;
+    $instance->initialize($instrumentation, $prefix, $spanKind, $name);
+    return $instance;
+  }
 
   /**
    * Initialize the instrumentation with configuration options.
@@ -39,7 +53,7 @@ trait InstrumentationTrait {
    * @throws \RuntimeException
    *   When neither instrumentation nor name is provided.
    */
-  protected static function initialize(
+  protected function initialize(
     $instrumentation = NULL,
     ?string $prefix = NULL,
     ?int $spanKind = SpanKind::KIND_INTERNAL,
@@ -63,65 +77,62 @@ trait InstrumentationTrait {
       ], TRUE),
       'Invalid span kind provided'
     );
-    static::$instrumentation = $instrumentation ?? new CachedInstrumentation($name);
-    static::$attributePrefix = $prefix;
-    static::$spanKind = $spanKind;
+    $this->instrumentation = $instrumentation ?? new CachedInstrumentation($name);
+    $this->attributePrefix = $prefix;
+    $this->spanKind = $spanKind;
   }
 
   /**
    * @param string $name
    * @return non-empty-string
    */
-  protected static function getAttributeName(string $name): string {
+  protected function getAttributeName(string $name): string {
     assert(!empty($name), 'Attribute name cannot be empty');
 
-    if (empty(static::$attributePrefix)) {
+    if (empty($this->attributePrefix)) {
       return $name;
     }
 
-    return static::$attributePrefix . '.' . $name;
+    return $this->attributePrefix . '.' . $name;
   }
 
   /**
    * @return object
    * @throws \RuntimeException
    */
-  protected static function getInstrumentation() {
-    if (static::$instrumentation === NULL) {
+  protected function getInstrumentation() {
+    if ($this->instrumentation === NULL) {
       throw new \RuntimeException('Instrumentation not initialized. Call initialize() first.');
     }
-    return static::$instrumentation;
+    return $this->instrumentation;
   }
 
-  /**
-   *
-   */
-  protected static function helperHook(
-    string $className,
+  public function helperHook(
     string $methodName,
     array $paramMap = [],
     ?string $returnValueKey = NULL,
     ?callable $preHandler = NULL,
     ?callable $postHandler = NULL,
-  ): void {
-    $resolvedParamMap = static::resolveParamPositions($className, $methodName, $paramMap);
+    ?string $className = NULL,
+  ): self {
+    $targetClass = $className ?? $this->className;
+    $resolvedParamMap = static::resolveParamPositions($targetClass, $methodName, $paramMap);
     static::registerHook(
-      $className,
+      $targetClass,
       $methodName,
-      pre: static::preHook("$className::$methodName", $resolvedParamMap, $preHandler),
-      post: static::postHook("$className::$methodName", $returnValueKey, $postHandler)
+      pre: $this->preHook("$targetClass::$methodName", $resolvedParamMap, $preHandler),
+      post: $this->postHook("$targetClass::$methodName", $returnValueKey, $postHandler)
     );
+
+    return $this;
   }
 
-  /**
-   *
-   */
-  protected static function preHook(
+  protected function preHook(
     string $operation,
     array $resolvedParamMap = [],
     ?callable $customHandler = NULL,
   ): callable {
-    return static function (
+    return function (
       $object,
       array $params,
       string $class,
@@ -132,23 +143,23 @@ trait InstrumentationTrait {
       $parent = static::getCurrentContext();
 
       /** @var \OpenTelemetry\API\Instrumentation\CachedInstrumentation $instrumentation */
-      $instrumentation = static::getInstrumentation();
+      $instrumentation = $this->getInstrumentation();
 
       $spanBuilder = $instrumentation->tracer()->spanBuilder("$class::$function")
         ->setParent($parent)
-        ->setSpanKind(static::$spanKind)
+        ->setSpanKind($this->spanKind)
         ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
         ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
         ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
         ->setAttribute(TraceAttributes::CODE_LINENO, $lineno);
 
-      $spanBuilder->setAttribute(static::getAttributeName('operation'), $operation);
+      $spanBuilder->setAttribute($this->getAttributeName('operation'), $operation);
 
       foreach ($resolvedParamMap as $attributeName => $position) {
         if (isset($params[$position])) {
           $value = $params[$position];
           $spanBuilder->setAttribute(
-            static::getAttributeName($attributeName),
+            $this->getAttributeName($attributeName),
             is_scalar($value) ? $value : json_encode($value)
           );
         }
@@ -163,15 +174,12 @@ trait InstrumentationTrait {
     };
   }
 
-  /**
-   *
-   */
-  protected static function postHook(
+  protected function postHook(
     string $operation,
     ?string $resultAttribute = NULL,
     ?callable $customHandler = NULL,
   ): callable {
-    return static function (
+    return function (
       $object,
       array $params,
       $returnValue,
@@ -186,7 +194,7 @@ trait InstrumentationTrait {
 
       if ($resultAttribute !== NULL) {
         $span->setAttribute(
-          static::getAttributeName($resultAttribute),
+          $this->getAttributeName($resultAttribute),
           is_scalar($returnValue) ? $returnValue : json_encode($returnValue)
         );
       }
@@ -205,9 +213,6 @@ trait InstrumentationTrait {
     };
   }
 
-  /**
-   *
-   */
   protected static function resolveParamPositions(
     string $className,
     string $methodName,
@@ -268,5 +273,4 @@ trait InstrumentationTrait {
   protected static function getSpanFromContext(ContextInterface $context): object {
     return Span::fromContext($context);
   }
-
 }
