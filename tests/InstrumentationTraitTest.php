@@ -30,6 +30,10 @@ interface TestTargetInterface {
 
 }
 
+function test_method(string $param1, array $param2): string {
+  return 'test-' . $param1;
+}
+
 /**
  *
  */
@@ -60,7 +64,7 @@ class TestInstrumentation {
     helperHook as public;
     postHook as public;
     getSpanFromContext as public traitGetSpanFromContext;
-    create as protected createClass;
+    create as public createClass;
   }
 
   /**
@@ -145,7 +149,7 @@ class TestInstrumentation {
    *
    */
   protected function registerHook(
-    string $className,
+    ?string $className,
     string $methodName,
     callable $pre,
     callable $post,
@@ -156,7 +160,7 @@ class TestInstrumentation {
 
     $params = $this->testParameters[$methodName] ?? [];
 
-    $pre($target, $params, $className, $methodName, $file, $line);
+    $pre($target, $params, $className ?? '', $methodName, $file, $line);
 
     if ($methodName === 'throwingMethod' && $this->testException) {
       $post($target, $params, NULL, $this->testException);
@@ -718,5 +722,46 @@ class InstrumentationTraitTest extends TestCase {
     // No assertion needed as we're testing that no exception is thrown.
     $this->addToAssertionCount(1);
   }
+
+  /**
+   * @covers ::create
+   * @covers ::initialize
+   * @covers ::helperHook
+   * @covers ::preHook
+   * @covers ::postHook
+   * @covers ::getSpanFromContext
+   * @covers ::getAttributeName
+   * @covers ::getContextStorage
+   * @covers ::getCurrentContext
+   * @covers ::getInstrumentation
+   * @covers ::resolveParamPositions
+   */
+  public function testFunctionParameterMapping(): void {
+    $testInstrumentation = TestInstrumentation::createClass(
+      instrumentation: $this->testInstrumentation,
+      prefix: 'test',
+    );
+    $testInstrumentation->setTestSpan($this->mockSpan);
+
+    // Configure test parameters.
+    $testInstrumentation->setTestParameters('PerformanceX\OpenTelemetry\Instrumentation\Tests\test_method', [
+      0 => 'param1',
+      1 => ['key' => 'value'],
+    ]);
+
+    $this->mockSpanBuilder->expects($this->exactly(6))
+      ->method('setAttribute')
+      ->withConsecutive(
+        [TraceAttributes::CODE_FUNCTION, 'PerformanceX\OpenTelemetry\Instrumentation\Tests\test_method'],
+        [TraceAttributes::CODE_NAMESPACE, ''],
+        [TraceAttributes::CODE_FILEPATH, '/test/file.php'],
+        [TraceAttributes::CODE_LINENO, 42],
+        ['test.operation', 'PerformanceX\OpenTelemetry\Instrumentation\Tests\test_method'],
+        ['test.param1', 'param1']
+      );
+
+    $testInstrumentation->helperHook('PerformanceX\OpenTelemetry\Instrumentation\Tests\test_method', ['param1' => 'param1'], 'returnValue');
+  }
+
 
 }
