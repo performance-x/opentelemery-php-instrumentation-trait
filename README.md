@@ -1,20 +1,16 @@
 # OpenTelemetry PHP Instrumentation Trait
-
-A trait to simplify creating OpenTelemetry instrumentations for PHP classes and interfaces.
+A trait to simplify creating OpenTelemetry instrumentations for PHP classes, interfaces, and functions.
 
 ## Installation
-
 ```bash
 composer require performance-x/opentelemetry-php-instrumentation-trait
 ```
 
 ## Usage
-
-The trait is designed to be used in instrumentation classes that register OpenTelemetry hooks for specific target classes or interfaces.
+The trait is designed to be used in instrumentation classes that register OpenTelemetry hooks for specific targets.
 
 ```php
 <?php
-
 namespace OpenTelemetry\Contrib\Instrumentation\Drupal;
 
 use Drupal\Core\Cache\CacheBackendInterface;
@@ -24,56 +20,54 @@ use PerformanceX\OpenTelemetry\Instrumentation\InstrumentationTrait;
 class CacheBackendInstrumentation {
   use InstrumentationTrait;
 
-  protected const CLASSNAME = CacheBackendInterface::class;
-
   public static function register(): void {
-    // Initialize with name and prefix
-    static::initialize(
+    // Create instance with name and prefix
+    $instrumentation = self::create(
       name: 'io.opentelemetry.contrib.php.drupal',
-      prefix: 'drupal.cache'
+      prefix: 'drupal.cache',
+      className: CacheBackendInterface::class
     );
 
     // Or with custom span kind
-    static::initialize(
+    $instrumentation = self::create(
       name: 'io.opentelemetry.contrib.php.drupal',
       prefix: 'drupal.cache',
-      spanKind: SpanKind::KIND_CLIENT
+      spanKind: SpanKind::KIND_CLIENT,
+      className: CacheBackendInterface::class
     );
 
     // Or with pre-configured instrumentation
-    static::initialize(
+    $instrumentation = self::create(
       instrumentation: new CachedInstrumentation('custom.name'),
-      prefix: 'drupal.cache'
+      prefix: 'drupal.cache',
+      className: CacheBackendInterface::class
     );
 
     // Register method hooks
-    static::helperHook(
-      self::CLASSNAME,
-      'get',
-      ['cid'],
-      'returnValue'
-    );
-
-    // With custom handlers
-    static::helperHook(
-      self::CLASSNAME,
-      'set',
-      ['cid', 'data', 'expire', 'tags'],
-      'returnValue',
-      preHandler: function($spanBuilder, $object, array $params, $class, $function, $filename, $lineno) {
-        $spanBuilder->setAttribute(static::getAttributeName('ttl'), $params[2] ?? 0);
-      },
-      postHandler: function($span, $object, array $params, $returnValue, $exception) {
-        $span->setAttribute(static::getAttributeName('success'), $returnValue !== FALSE);
-      }
-    );
+    $instrumentation
+      ->helperHook(
+        'get',
+        ['cid'],
+        'returnValue'
+      )
+      ->helperHook(
+        'set',
+        ['cid', 'data', 'expire', 'tags'],
+        'returnValue',
+        preHandler: function($spanBuilder, $object, array $params, $class, $function, $filename, $lineno) {
+          $spanBuilder->setAttribute($this->getAttributeName('ttl'), $params[2] ?? 0);
+        },
+        postHandler: function($span, $object, array $params, $returnValue, $exception) {
+          $span->setAttribute($this->getAttributeName('success'), $returnValue !== FALSE);
+        }
+      );
   }
 }
 ```
 
 ## Features
-
 - Easy initialization of OpenTelemetry instrumentation
+- Support for both class methods and standalone functions
 - Configurable span kind (defaults to INTERNAL)
 - Automatic prefix for all span attributes via getAttributeName()
 - Parameter mapping to span attributes
@@ -83,29 +77,25 @@ class CacheBackendInstrumentation {
 - Code location attributes (function, namespace, file, line)
 
 ## Configuration Options
-
-The `initialize()` method accepts:
-
+The `create()` method accepts:
 - `instrumentation`: Optional pre-configured instrumentation instance
 - `prefix`: Optional prefix for all span attributes
 - `spanKind`: Kind of spans to create (default: INTERNAL)
+- `className`: Optional target class name
 - `name`: Name of the instrumentation if no instrumentation instance provided
 
 At least one of `instrumentation` or `name` must be provided.
 
 ## Hook Configuration
-
 The `helperHook()` method accepts:
-
-- `className`: The class or interface to instrument
-- `methodName`: The method to hook
+- `methodName`: The method or function to hook
 - `paramMap`: Array of parameters to capture as attributes
 - `returnValueKey`: Optional key for the return value attribute
 - `preHandler`: Optional callback for custom span building
 - `postHandler`: Optional callback for custom span finishing
+- `className`: Optional override of target class name
 
 ## Parameter Mapping
-
 The `paramMap` argument in `helperHook()` supports several ways to map method parameters to span attributes:
 
 ### Value Handling
@@ -113,10 +103,9 @@ The trait automatically handles different parameter types appropriately. For exa
 
 ```php
 /**
- * @see \Drupal\Core\Cache\CacheBackendInterface::set()
- */
-static::helperHook(
-    self::CLASSNAME,
+* @see \Drupal\Core\Cache\CacheBackendInterface::set()
+*/
+$instrumentation->helperHook(
     'set',
     [
         'cid',           // String cache ID stored as-is
@@ -140,8 +129,7 @@ $cache->set('my-key', ['foo' => 'bar'], time() + 3600, ['tag1', 'tag2']);
 ### Simple Parameter Mapping
 ```php
 // Maps the 'cid' parameter to 'drupal.cache.cid' attribute
-static::helperHook(
-    self::CLASSNAME,
+$instrumentation->helperHook(
     'get',
     ['cid'],  // Parameter name becomes the attribute name
 );
@@ -156,8 +144,7 @@ $cache->get('my-key');
 ### Custom Attribute Names
 ```php
 // Maps the 'cid' parameter to 'drupal.cache.key' attribute
-static::helperHook(
-    self::CLASSNAME,
+$instrumentation->helperHook(
     'get',
     ['cid' => 'key'],  // Parameter name => custom attribute name
 );
@@ -171,8 +158,7 @@ $cache->get('my-key');
 
 ### Multiple Parameters with Custom Names
 ```php
-static::helperHook(
-    self::CLASSNAME,
+$instrumentation->helperHook(
     'set',
     [
         'cid' => 'key',        // Will be prefixed: 'drupal.cache.key'
@@ -197,11 +183,10 @@ The trait can capture method return values. For example, with Drupal's cache `ge
 
 ```php
 /**
- * @see \Drupal\Core\Cache\CacheBackendInterface::get()
- * Returns object|false The cache item or FALSE on failure.
- */
-static::helperHook(
-    self::CLASSNAME,
+* @see \Drupal\Core\Cache\CacheBackendInterface::get()
+* Returns object|false The cache item or FALSE on failure.
+*/
+$instrumentation->helperHook(
     'get',
     ['cid'],
     'returnValue'  // Capture the return value under this attribute name
@@ -224,22 +209,21 @@ $cache->get('missing-key');  // Returns FALSE
 
 ### Combined with Custom Handlers
 ```php
-static::helperHook(
-    self::CLASSNAME,
+$instrumentation->helperHook(
     'get',
     ['cid'],  // Map the cache ID parameter
     'returnValue',
     preHandler: function($spanBuilder, $object, array $params, $class, $function, $filename, $lineno) {
         // Add timestamp when cache was checked
         $spanBuilder->setAttribute(
-            static::getAttributeName('custom_time'),
+            $this->getAttributeName('custom_time'),
             time()
         );
     },
     postHandler: function($span, $object, array $params, $returnValue, $exception) {
         // Track if this was a cache hit
         $span->setAttribute(
-            static::getAttributeName('hit'),
+            $this->getAttributeName('hit'),
             $returnValue !== FALSE
         );
     }
@@ -262,10 +246,9 @@ The trait automatically handles exceptions, but you can customize error handling
 
 ```php
 /**
- * @see \Drupal\Core\Cache\CacheBackendInterface::get()
- */
-static::helperHook(
-    self::CLASSNAME,
+* @see \Drupal\Core\Cache\CacheBackendInterface::get()
+*/
+$instrumentation->helperHook(
     'get',
     ['cid'],
     'returnValue',
@@ -273,22 +256,21 @@ static::helperHook(
         if ($exception) {
             // Add minimal error context - detailed information should go to logs
             $span->setAttribute(
-                static::getAttributeName('error_context'),
+                $this->getAttributeName('error_context'),
                 [
                     'cache_backend' => get_class($object),
                     'attempted_key' => $params[0] ?? null,
                 ]
             );
-
             // Simple error categorization helps with metrics
             if ($exception instanceof \InvalidArgumentException) {
-                $span->setAttribute(static::getAttributeName('error_type'), 'validation');
+                $span->setAttribute($this->getAttributeName('error_type'), 'validation');
             } elseif ($exception instanceof \RuntimeException) {
-                $span->setAttribute(static::getAttributeName('error_type'), 'connection');
+                $span->setAttribute($this->getAttributeName('error_type'), 'connection');
             }
         } elseif ($returnValue === FALSE) {
             // Track cache misses for performance monitoring
-            $span->setAttribute(static::getAttributeName('cache_miss'), true);
+            $span->setAttribute($this->getAttributeName('cache_miss'), true);
         }
     }
 );
@@ -320,10 +302,8 @@ try {
 ```
 
 ## Requirements
-
 - PHP 8.1+
 - OpenTelemetry PHP SDK
 
 ## License
-
 MIT License

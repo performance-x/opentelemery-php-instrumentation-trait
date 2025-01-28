@@ -17,12 +17,48 @@ use function OpenTelemetry\Instrumentation\hook;
  */
 trait InstrumentationTrait {
   /**
-   * @var object|null */
-  protected static $instrumentation = NULL;
-  protected static ?string $attributePrefix = NULL;
+   * @var object|null*/
+  protected ?object $instrumentation = NULL;
+  protected ?string $attributePrefix = NULL;
+
   /**
    * @var \OpenTelemetry\API\Trace\SpanKind::KIND_* */
-  protected static int $spanKind = SpanKind::KIND_INTERNAL;
+  protected int $spanKind = SpanKind::KIND_INTERNAL;
+  protected ?string $className = NULL;
+
+  /**
+   * Create new instrumentation with configuration options.
+   *
+   * @param string|null $name
+   *   Name of the instrumentation if no CachedInstrumentation provided.
+   * @param string|null $prefix
+   *   Prefix for all span attributes.
+   * @param \OpenTelemetry\API\Trace\SpanKind::KIND_* $spanKind
+   *   Kind of spans to create (default: INTERNAL).
+   * @param object|null $instrumentation
+   *   Optional pre-configured instrumentation.
+   *
+   * @throws \RuntimeException
+   *   When neither instrumentation nor name is provided.
+   */
+  public static function create(
+    ?string $name = NULL,
+    ?string $prefix = NULL,
+    ?int $spanKind = SpanKind::KIND_INTERNAL,
+    ?object $instrumentation = NULL,
+    ?string $className = NULL,
+  ): static {
+    $instance = new static();
+    $instance->className = $className;
+    $instance->initialize(instrumentation: $instrumentation, prefix: $prefix, spanKind: $spanKind, name: $name);
+    return $instance;
+  }
+
+  /**
+ * Final constructor, so we can use a factory method above.
+ */
+  final public function __construct() {
+  }
 
   /**
    * Initialize the instrumentation with configuration options.
@@ -39,7 +75,7 @@ trait InstrumentationTrait {
    * @throws \RuntimeException
    *   When neither instrumentation nor name is provided.
    */
-  protected static function initialize(
+  protected function initialize(
     $instrumentation = NULL,
     ?string $prefix = NULL,
     ?int $spanKind = SpanKind::KIND_INTERNAL,
@@ -63,92 +99,101 @@ trait InstrumentationTrait {
       ], TRUE),
       'Invalid span kind provided'
     );
-    static::$instrumentation = $instrumentation ?? new CachedInstrumentation($name);
-    static::$attributePrefix = $prefix;
-    static::$spanKind = $spanKind;
+    $this->instrumentation = $instrumentation ?? new CachedInstrumentation($name);
+    $this->attributePrefix = $prefix;
+    $this->spanKind = $spanKind;
   }
 
   /**
    * @param string $name
    * @return non-empty-string
    */
-  protected static function getAttributeName(string $name): string {
+  protected function getAttributeName(string $name): string {
     assert(!empty($name), 'Attribute name cannot be empty');
 
-    if (empty(static::$attributePrefix)) {
+    if (empty($this->attributePrefix)) {
       return $name;
     }
 
-    return static::$attributePrefix . '.' . $name;
+    return $this->attributePrefix . '.' . $name;
   }
 
   /**
    * @return object
    * @throws \RuntimeException
    */
-  protected static function getInstrumentation() {
-    if (static::$instrumentation === NULL) {
+  protected function getInstrumentation() {
+    if ($this->instrumentation === NULL) {
       throw new \RuntimeException('Instrumentation not initialized. Call initialize() first.');
     }
-    return static::$instrumentation;
+    return $this->instrumentation;
   }
 
   /**
    *
    */
-  protected static function helperHook(
-    string $className,
+  public function helperHook(
     string $methodName,
     array $paramMap = [],
     ?string $returnValueKey = NULL,
     ?callable $preHandler = NULL,
     ?callable $postHandler = NULL,
-  ): void {
-    $resolvedParamMap = static::resolveParamPositions($className, $methodName, $paramMap);
+    ?string $className = NULL,
+  ): self {
+    $targetClass = $className ?? $this->className;
+    $operation = $targetClass ? "$targetClass::$methodName" : $methodName;
+
+    $resolvedParamMap = static::resolveParamPositions($targetClass, $methodName, $paramMap);
     static::registerHook(
-      $className,
+      $targetClass,
       $methodName,
-      pre: static::preHook("$className::$methodName", $resolvedParamMap, $preHandler),
-      post: static::postHook("$className::$methodName", $returnValueKey, $postHandler)
+      pre: $this->preHook($operation, $resolvedParamMap, $preHandler),
+      post: $this->postHook($operation, $returnValueKey, $postHandler)
     );
+
+    return $this;
   }
 
   /**
    *
    */
-  protected static function preHook(
+  protected function preHook(
     string $operation,
     array $resolvedParamMap = [],
     ?callable $customHandler = NULL,
   ): callable {
-    return static function (
+    return function (
       $object,
       array $params,
       string $class,
       string $function,
       ?string $filename,
       ?int $lineno,
-    ) use ($operation, $resolvedParamMap, $customHandler): void {
+    ) use (
+      $operation,
+      $resolvedParamMap,
+      $customHandler
+): void {
       $parent = static::getCurrentContext();
 
       /** @var \OpenTelemetry\API\Instrumentation\CachedInstrumentation $instrumentation */
-      $instrumentation = static::getInstrumentation();
+      $instrumentation = $this->getInstrumentation();
 
       $spanBuilder = $instrumentation->tracer()->spanBuilder("$class::$function")
         ->setParent($parent)
-        ->setSpanKind(static::$spanKind)
+        ->setSpanKind($this->spanKind)
         ->setAttribute(TraceAttributes::CODE_FUNCTION, $function)
         ->setAttribute(TraceAttributes::CODE_NAMESPACE, $class)
         ->setAttribute(TraceAttributes::CODE_FILEPATH, $filename)
         ->setAttribute(TraceAttributes::CODE_LINENO, $lineno);
 
-      $spanBuilder->setAttribute(static::getAttributeName('operation'), $operation);
+      $spanBuilder->setAttribute($this->getAttributeName('operation'), $operation);
 
       foreach ($resolvedParamMap as $attributeName => $position) {
         if (isset($params[$position])) {
           $value = $params[$position];
           $spanBuilder->setAttribute(
-            static::getAttributeName($attributeName),
+            $this->getAttributeName($attributeName),
             is_scalar($value) ? $value : json_encode($value)
           );
         }
@@ -166,17 +211,20 @@ trait InstrumentationTrait {
   /**
    *
    */
-  protected static function postHook(
+  protected function postHook(
     string $operation,
     ?string $resultAttribute = NULL,
     ?callable $customHandler = NULL,
   ): callable {
-    return static function (
+    return function (
       $object,
       array $params,
       $returnValue,
       ?\Throwable $exception,
-    ) use ($resultAttribute, $customHandler): void {
+    ) use (
+      $resultAttribute,
+      $customHandler
+): void {
       $scope = static::getContextStorage()->scope();
       if (!$scope) {
         return;
@@ -186,7 +234,7 @@ trait InstrumentationTrait {
 
       if ($resultAttribute !== NULL) {
         $span->setAttribute(
-          static::getAttributeName($resultAttribute),
+          $this->getAttributeName($resultAttribute),
           is_scalar($returnValue) ? $returnValue : json_encode($returnValue)
         );
       }
@@ -209,7 +257,7 @@ trait InstrumentationTrait {
    *
    */
   protected static function resolveParamPositions(
-    string $className,
+    ?string $className,
     string $methodName,
     array $paramMap,
   ): array {
@@ -217,7 +265,15 @@ trait InstrumentationTrait {
       return [];
     }
 
-    $reflection = new \ReflectionMethod($className, $methodName);
+    if ($className === NULL) {
+      // Handle standalone functions.
+      $reflection = new \ReflectionFunction($methodName);
+    }
+    else {
+      // Handle class methods.
+      $reflection = new \ReflectionMethod($className, $methodName);
+    }
+
     $parameters = $reflection->getParameters();
     $resolvedMap = [];
     foreach ($paramMap as $key => $value) {
@@ -239,7 +295,7 @@ trait InstrumentationTrait {
    * @codeCoverageIgnore
    */
   protected static function registerHook(
-    string $className,
+    ?string $className,
     string $methodName,
     callable $pre,
     callable $post,
