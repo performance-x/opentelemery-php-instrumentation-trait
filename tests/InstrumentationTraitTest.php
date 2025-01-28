@@ -56,73 +56,95 @@ class TestTarget implements TestTargetInterface {
  */
 class TestInstrumentation {
   use InstrumentationTrait {
-    initialize as public;
     getInstrumentation as public;
     helperHook as public;
     postHook as public;
     getSpanFromContext as public traitGetSpanFromContext;
+    create as protected createClass;
+  }
+
+  /**
+   * Creates and initializes the instrumentation.
+   */
+  public static function create(
+    object $instrumentation = NULL,
+    ?string $prefix = NULL,
+    ?int $spanKind = SpanKind::KIND_INTERNAL,
+    ?string $className = NULL,
+    ?string $name = NULL
+  ): static {
+    $targetClass = $className ?? static::CLASSNAME;
+    $instance = static::createClass(instrumentation: $instrumentation, prefix: $prefix, spanKind: $spanKind, className: $targetClass, name: $name);
+    $instance->setTestSpan(static::$initialTestSpan);
+    return $instance;
   }
 
   protected const CLASSNAME = TestTargetInterface::class;
 
-  protected static array $testParameters = [];
+  protected array $testParameters = [];
   /**
    * @var array<string, mixed>
    */
-  protected static array $testReturnValues = [];
-  protected static ?\Throwable $testException = NULL;
-  protected static ?SpanInterface $testSpan = NULL;
+  protected array $testReturnValues = [];
+  protected ?\Throwable $testException = NULL;
+  protected ?SpanInterface $testSpan = NULL;
+
+  protected static ?SpanInterface $initialTestSpan = NULL;
 
   /**
    *
    */
-  public static function setTestParameters(string $methodName, array $params): void {
-    static::$testParameters[$methodName] = $params;
+  public function setTestParameters(string $methodName, array $params): void {
+    $this->testParameters[$methodName] = $params;
   }
 
   /**
    * @param mixed $value
    */
-  public static function setTestReturnValue(string $methodName, mixed $value): void {
-    static::$testReturnValues[$methodName] = $value;
+  public function setTestReturnValue(string $methodName, mixed $value): void {
+    $this->testReturnValues[$methodName] = $value;
   }
 
   /**
    *
    */
-  public static function setTestException(\Throwable $exception): void {
-    static::$testException = $exception;
+  public function setTestException(\Throwable $exception): void {
+    $this->testException = $exception;
   }
 
   /**
    *
    */
-  public static function setTestSpan(SpanInterface $span): void {
-    static::$testSpan = $span;
+  public function setTestSpan(SpanInterface $span): void {
+    $this->testSpan = $span;
+  }
+
+  public static function setInitialTestSpan(SpanInterface $span): void {
+    static::$initialTestSpan = $span;
   }
 
   /**
    *
    */
-  public static function resetInstrumentation(): void {
-    static::$instrumentation = NULL;
+  public function resetInstrumentation(): void {
+    $this->instrumentation = NULL;
   }
 
   /**
    *
    */
-  protected static function getSpanFromContext(ContextInterface $context): SpanInterface {
-    if (static::$testSpan === NULL) {
+  protected function getSpanFromContext(ContextInterface $context): SpanInterface {
+    if ($this->testSpan === NULL) {
       throw new \RuntimeException('Test span not initialized. Call setTestSpan() first.');
     }
 
-    return static::$testSpan;
+    return $this->testSpan;
   }
 
   /**
    *
    */
-  protected static function registerHook(
+  protected function registerHook(
     string $className,
     string $methodName,
     callable $pre,
@@ -132,15 +154,15 @@ class TestInstrumentation {
     $file = '/test/file.php';
     $line = 42;
 
-    $params = static::$testParameters[$methodName] ?? [];
+    $params = $this->testParameters[$methodName] ?? [];
 
     $pre($target, $params, $className, $methodName, $file, $line);
 
-    if ($methodName === 'throwingMethod' && static::$testException) {
-      $post($target, $params, NULL, static::$testException);
+    if ($methodName === 'throwingMethod' && $this->testException) {
+      $post($target, $params, NULL, $this->testException);
     }
     else {
-      $returnValue = static::$testReturnValues[$methodName] ?? 'test-result';
+      $returnValue = $this->testReturnValues[$methodName] ?? 'test-result';
       $post($target, $params, $returnValue, NULL);
     }
   }
@@ -149,12 +171,13 @@ class TestInstrumentation {
    *
    */
   public static function register(): void {
-    static::initialize(
+    $instance = TestInstrumentation::create(
       name: 'io.opentelemetry.contrib.php.test',
-      prefix: 'test'
+      prefix: 'test',
+      className: self::CLASSNAME
     );
-    static::helperHook(self::CLASSNAME, 'testMethod', ['param1', 'param2'], 'returnValue');
-    static::helperHook(self::CLASSNAME, 'throwingMethod', [], 'returnValue');
+    $instance->helperHook('testMethod', ['param1', 'param2'], 'returnValue');
+    $instance->helperHook('throwingMethod', [], 'returnValue');
   }
 
 }
@@ -182,6 +205,8 @@ class InstrumentationTraitTest extends TestCase {
 
   private TestCachedInstrumentation $testInstrumentation;
 
+  public static $staticMockSpan = NULL;
+
   /**
    *
    */
@@ -205,19 +230,21 @@ class InstrumentationTraitTest extends TestCase {
     // Create test instrumentation.
     $this->testInstrumentation = new TestCachedInstrumentation('test');
     $this->testInstrumentation->setTracer($this->mockTracer);
-    TestInstrumentation::setTestSpan($this->mockSpan);
+    TestInstrumentation::setInitialTestSpan($this->mockSpan);
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::getInstrumentation
    */
   public function testInitialization(): void {
-    TestInstrumentation::initialize(instrumentation: $this->testInstrumentation);
-    $this->assertSame($this->testInstrumentation, TestInstrumentation::getInstrumentation());
+    $testInstrumentation = TestInstrumentation::create(instrumentation: $this->testInstrumentation);
+    $this->assertSame($this->testInstrumentation, $testInstrumentation->getInstrumentation());
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
@@ -230,13 +257,13 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testParameterMapping(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation,
-      prefix: 'test'
+      prefix: 'test',
     );
 
     // Configure test parameters.
-    TestInstrumentation::setTestParameters('testMethod', [
+    $testInstrumentation->setTestParameters('testMethod', [
       0 => 'param1',
       1 => ['key' => 'value'],
     ]);
@@ -252,15 +279,11 @@ class InstrumentationTraitTest extends TestCase {
         ['test.param1', 'param1']
       );
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'testMethod',
-      ['param1' => 'param1'],
-      'returnValue'
-    );
+    $testInstrumentation->helperHook('testMethod', ['param1' => 'param1'], 'returnValue');
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
@@ -273,7 +296,7 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testCustomHandlers(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation,
       prefix: 'custom'
     );
@@ -281,16 +304,15 @@ class InstrumentationTraitTest extends TestCase {
     $preHandlerCalled = FALSE;
     $postHandlerCalled = FALSE;
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
+    $testInstrumentation->helperHook(
       'testMethod',
       [],
       NULL,
-      preHandler: function ($spanBuilder) use (&$preHandlerCalled) {
+      function ($spanBuilder) use (&$preHandlerCalled) {
         $preHandlerCalled = TRUE;
         $spanBuilder->setAttribute('custom.pre', 'value');
       },
-      postHandler: function ($span) use (&$postHandlerCalled) {
+      function ($span) use (&$postHandlerCalled) {
         $postHandlerCalled = TRUE;
         $span->setAttribute('custom.post', 'value');
       }
@@ -301,6 +323,7 @@ class InstrumentationTraitTest extends TestCase {
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::postHook
@@ -313,7 +336,7 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testExceptionHandling(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation
     );
 
@@ -331,16 +354,13 @@ class InstrumentationTraitTest extends TestCase {
       ->with(StatusCode::STATUS_ERROR, 'Test exception');
 
     $exception = new \RuntimeException('Test exception');
-    TestInstrumentation::setTestException($exception);
+    $testInstrumentation->setTestException($exception);
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'throwingMethod',
-      []
-    );
+    $testInstrumentation->helperHook('throwingMethod', []);
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::postHook
@@ -353,33 +373,28 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testReturnValueHandling(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation,
       prefix: 'test'
     );
 
     // Configure test parameters and return value.
-    TestInstrumentation::setTestParameters('testMethod', [
+    $testInstrumentation->setTestParameters('testMethod', [
       0 => 'param1',
       1 => ['key' => 'value'],
     ]);
 
-    TestInstrumentation::setTestReturnValue('testMethod', 'test-result');
+    $testInstrumentation->setTestReturnValue('testMethod', 'test-result');
 
     $this->mockSpan->expects($this->once())
       ->method('setAttribute')
       ->with('test.result', 'test-result');
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'testMethod',
-      [],
-    // Return value will be captured under this key.
-      'result'
-    );
+    $testInstrumentation->helperHook('testMethod', [], 'result');
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
@@ -391,7 +406,7 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testSpanKindConfiguration(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation,
       spanKind: SpanKind::KIND_SERVER
     );
@@ -400,14 +415,11 @@ class InstrumentationTraitTest extends TestCase {
       ->method('setSpanKind')
       ->with(SpanKind::KIND_SERVER);
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'testMethod',
-      []
-    );
+    $testInstrumentation->helperHook('testMethod', []);
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
@@ -419,7 +431,7 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testAttributePrefix(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation,
       prefix: 'custom.prefix'
     );
@@ -434,24 +446,22 @@ class InstrumentationTraitTest extends TestCase {
           ['custom.prefix.operation', TestTargetInterface::class . '::testMethod']
         );
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'testMethod',
-      []
-    );
+    $testInstrumentation->helperHook('testMethod', []);
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    */
   public function testInitializationValidation(): void {
     $this->expectException(\RuntimeException::class);
     $this->expectExceptionMessage('Either instrumentation or a non-empty name must be provided');
 
-    TestInstrumentation::initialize();
+    TestInstrumentation::create();
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::postHook
@@ -464,12 +474,12 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testArrayParameterHandling(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation,
       prefix: 'test'
     );
 
-    TestInstrumentation::setTestParameters('testMethod', [
+    $testInstrumentation->setTestParameters('testMethod', [
       0 => 'param1',
       1 => ['nested' => ['value' => 'test']],
     ]);
@@ -485,14 +495,11 @@ class InstrumentationTraitTest extends TestCase {
         ['test.param2', '{"nested":{"value":"test"}}']
       );
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'testMethod',
-      ['param2' => 'param2']
-    );
+    $testInstrumentation->helperHook('testMethod', ['param2' => 'param2']);
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::postHook
@@ -505,29 +512,25 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testComplexReturnValueHandling(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation,
       prefix: 'test'
     );
 
     // Need to modify registerHook in TestInstrumentation to use this value.
     $complexReturn = ['status' => TRUE, 'data' => ['key' => 'value']];
-    TestInstrumentation::setTestParameters('testMethod', []);
-    TestInstrumentation::setTestReturnValue('testMethod', $complexReturn);
+    $testInstrumentation->setTestParameters('testMethod', []);
+    $testInstrumentation->setTestReturnValue('testMethod', $complexReturn);
 
     $this->mockSpan->expects($this->once())
       ->method('setAttribute')
       ->with('test.result', '{"status":true,"data":{"key":"value"}}');
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'testMethod',
-      [],
-      'result'
-    );
+    $testInstrumentation->helperHook('testMethod', [], 'result');
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
@@ -539,12 +542,12 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testMultipleParameterMapping(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation,
       prefix: 'test'
     );
 
-    TestInstrumentation::setTestParameters('testMethod', [
+    $testInstrumentation->setTestParameters('testMethod', [
       0 => 'value1',
       1 => ['key' => 'value'],
     ]);
@@ -561,14 +564,11 @@ class InstrumentationTraitTest extends TestCase {
         ['test.second', '{"key":"value"}']
       );
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'testMethod',
-      ['param1' => 'first', 'param2' => 'second']
-    );
+    $testInstrumentation->helperHook('testMethod', ['param1' => 'first', 'param2' => 'second']);
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
@@ -580,7 +580,7 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testNonExistentParameterMapping(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation,
       prefix: 'test'
     );
@@ -595,14 +595,11 @@ class InstrumentationTraitTest extends TestCase {
         ['test.operation', TestTargetInterface::class . '::testMethod']
       );
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'testMethod',
-      ['nonexistent' => 'value']
-    );
+    $testInstrumentation->helperHook('testMethod', ['nonexistent' => 'value']);
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::postHook
@@ -615,7 +612,7 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testNestedExceptionHandling(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation
     );
 
@@ -625,20 +622,17 @@ class InstrumentationTraitTest extends TestCase {
       new \Exception('Original error')
     );
 
-    TestInstrumentation::setTestException($nestedException);
+    $testInstrumentation->setTestException($nestedException);
 
     $this->mockSpan->expects($this->once())
       ->method('recordException')
       ->with($nestedException);
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'throwingMethod',
-      []
-    );
+    $testInstrumentation->helperHook('throwingMethod', []);
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::helperHook
    * @covers ::preHook
@@ -651,7 +645,7 @@ class InstrumentationTraitTest extends TestCase {
    * @covers ::resolveParamPositions
    */
   public function testEmptyPrefixBehavior(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation,
       prefix: ''
     );
@@ -666,51 +660,52 @@ class InstrumentationTraitTest extends TestCase {
         ['operation', TestTargetInterface::class . '::testMethod']
       );
 
-    TestInstrumentation::helperHook(
-      TestTargetInterface::class,
-      'testMethod',
-      []
-    );
+    $testInstrumentation->helperHook('testMethod', []);
   }
 
   /**
+   * @covers ::create
+   * @covers ::initialize
    * @covers ::getInstrumentation
    */
   public function testUninitializedInstrumentation(): void {
-    TestInstrumentation::resetInstrumentation();
+    $testInstrumentation = TestInstrumentation::create(name: 'test');
+    $testInstrumentation->resetInstrumentation();
 
     $this->expectException(\RuntimeException::class);
     $this->expectExceptionMessage('Instrumentation not initialized. Call initialize() first.');
-    TestInstrumentation::getInstrumentation();
+    $testInstrumentation->getInstrumentation();
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::getSpanFromContext
    */
   public function testGetSpanFromContext(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation
     );
 
     $context = $this->createMock(ContextInterface::class);
 
     // This should work as expected.
-    $span = TestInstrumentation::traitGetSpanFromContext($context);
+    $span = $testInstrumentation->traitGetSpanFromContext($context);
     $this->assertInstanceOf(NonRecordingSpan::class, $span);
   }
 
   /**
+   * @covers ::create
    * @covers ::initialize
    * @covers ::getContextStorage
    * @covers ::postHook
    */
   public function testPostHookWithoutScope(): void {
-    TestInstrumentation::initialize(
+    $testInstrumentation = TestInstrumentation::create(
       instrumentation: $this->testInstrumentation
     );
 
-    $post = TestInstrumentation::postHook('test.operation');
+    $post = $testInstrumentation->postHook('test.operation');
 
     // Call postHook with some test data.
     $post(
