@@ -42,11 +42,11 @@ trait InstrumentationTrait {
    *   When neither instrumentation nor name is provided.
    */
   public static function create(
-    string $name = NULL,
+    ?string $name = NULL,
     ?string $prefix = NULL,
     ?int $spanKind = SpanKind::KIND_INTERNAL,
     ?object $instrumentation = NULL,
-    ?string $className = NULL
+    ?string $className = NULL,
   ): static {
     $instance = new static();
     $instance->className = $className;
@@ -170,9 +170,9 @@ trait InstrumentationTrait {
       ?string $filename,
       ?int $lineno,
     ) use (
-$operation,
- $resolvedParamMap,
- $customHandler
+      $operation,
+      $resolvedParamMap,
+      $customHandler
 ): void {
       $parent = static::getCurrentContext();
 
@@ -222,8 +222,8 @@ $operation,
       $returnValue,
       ?\Throwable $exception,
     ) use (
-$resultAttribute,
- $customHandler
+      $resultAttribute,
+      $customHandler
 ): void {
       $scope = static::getContextStorage()->scope();
       if (!$scope) {

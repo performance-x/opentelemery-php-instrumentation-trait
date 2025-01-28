@@ -87,11 +87,11 @@ class TestInstrumentation {
    *   When neither instrumentation nor name is provided.
    */
   public static function create(
-    object $instrumentation = NULL,
+    ?object $instrumentation = NULL,
     ?string $prefix = NULL,
     ?int $spanKind = SpanKind::KIND_INTERNAL,
     ?string $className = NULL,
-    ?string $name = NULL
+    ?string $name = NULL,
   ): static {
     $targetClass = $className ?? static::CLASSNAME;
     $instance = static::createClass(instrumentation: $instrumentation, prefix: $prefix, spanKind: $spanKind, className: $targetClass, name: $name);
