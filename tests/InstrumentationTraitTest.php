@@ -30,6 +30,10 @@ interface TestTargetInterface {
 
 }
 
+/**
+ * @param string $param1
+ * @param array $param2
+ */
 function test_method(string $param1, array $param2): string {
   return 'test-' . $param1;
 }
@@ -119,7 +123,6 @@ class TestInstrumentation {
   }
 
   /**
-   * @param mixed $value
    */
   public function setTestReturnValue(string $methodName, mixed $value): void {
     $this->testReturnValues[$methodName] = $value;
@@ -139,6 +142,9 @@ class TestInstrumentation {
     $this->testSpan = $span;
   }
 
+  /**
+   *
+   */
   public static function setInitialTestSpan(SpanInterface $span): void {
     static::$initialTestSpan = $span;
   }
@@ -454,6 +460,8 @@ class InstrumentationTraitTest extends TestCase {
       prefix: 'custom.prefix'
     );
 
+    $operation = TestTargetInterface::class . '::testMethod';
+
     $this->mockSpanBuilder->expects($this->exactly(5))
       ->method('setAttribute')
       ->withConsecutive(
@@ -461,7 +469,7 @@ class InstrumentationTraitTest extends TestCase {
           [TraceAttributes::CODE_NAMESPACE, TestTargetInterface::class],
           [TraceAttributes::CODE_FILEPATH, '/test/file.php'],
           [TraceAttributes::CODE_LINENO, 42],
-          ['custom.prefix.operation', TestTargetInterface::class . '::testMethod']
+          ['custom.prefix.operation', $operation],
         );
 
     $testInstrumentation->helperHook('testMethod', []);
@@ -582,7 +590,9 @@ class InstrumentationTraitTest extends TestCase {
         ['test.second', '{"key":"value"}']
       );
 
-    $testInstrumentation->helperHook('testMethod', ['param1' => 'first', 'param2' => 'second']);
+    $testInstrumentation->helperHook('testMethod',
+      ['param1' => 'first', 'param2' => 'second']
+    );
   }
 
   /**
@@ -757,8 +767,10 @@ class InstrumentationTraitTest extends TestCase {
     );
     $testInstrumentation->setTestSpan($this->mockSpan);
 
+    $method_name = 'PerformanceX\OpenTelemetry\Instrumentation\Tests\test_method';
+
     // Configure test parameters.
-    $testInstrumentation->setTestParameters('PerformanceX\OpenTelemetry\Instrumentation\Tests\test_method', [
+    $testInstrumentation->setTestParameters($method_name, [
       0 => 'param1',
       1 => ['key' => 'value'],
     ]);
@@ -766,16 +778,15 @@ class InstrumentationTraitTest extends TestCase {
     $this->mockSpanBuilder->expects($this->exactly(6))
       ->method('setAttribute')
       ->withConsecutive(
-        [TraceAttributes::CODE_FUNCTION, 'PerformanceX\OpenTelemetry\Instrumentation\Tests\test_method'],
+        [TraceAttributes::CODE_FUNCTION, $method_name],
         [TraceAttributes::CODE_NAMESPACE, ''],
         [TraceAttributes::CODE_FILEPATH, '/test/file.php'],
         [TraceAttributes::CODE_LINENO, 42],
-        ['test.operation', 'PerformanceX\OpenTelemetry\Instrumentation\Tests\test_method'],
+        ['test.operation', $method_name],
         ['test.param1', 'param1']
       );
 
-    $testInstrumentation->helperHook('PerformanceX\OpenTelemetry\Instrumentation\Tests\test_method', ['param1' => 'param1'], 'returnValue');
+    $testInstrumentation->helperHook($method_name, ['param1' => 'param1'], 'returnValue');
   }
-
 
 }

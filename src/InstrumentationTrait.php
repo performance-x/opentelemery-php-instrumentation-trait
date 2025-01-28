@@ -12,11 +12,15 @@ use OpenTelemetry\Context\ContextStorageInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
 use function OpenTelemetry\Instrumentation\hook;
 
+/**
+ *
+ */
 trait InstrumentationTrait {
   /**
-   * @var object|null */
+   * @var object|null*/
   protected ?object $instrumentation = NULL;
   protected ?string $attributePrefix = NULL;
+
   /**
    * @var \OpenTelemetry\API\Trace\SpanKind::KIND_* */
   protected int $spanKind = SpanKind::KIND_INTERNAL;
@@ -25,14 +29,14 @@ trait InstrumentationTrait {
   /**
    * Create new instrumentation with configuration options.
    *
-   * @param object|null $instrumentation
-   *   Optional pre-configured instrumentation.
+   * @param string|null $name
+   *   Name of the instrumentation if no CachedInstrumentation provided.
    * @param string|null $prefix
    *   Prefix for all span attributes.
    * @param \OpenTelemetry\API\Trace\SpanKind::KIND_* $spanKind
    *   Kind of spans to create (default: INTERNAL).
-   * @param string|null $name
-   *   Name of the instrumentation if no CachedInstrumentation provided.
+   * @param object|null $instrumentation
+   *   Optional pre-configured instrumentation.
    *
    * @throws \RuntimeException
    *   When neither instrumentation nor name is provided.
@@ -50,8 +54,11 @@ trait InstrumentationTrait {
     return $instance;
   }
 
-  // Final constructor, so we can use a factory method above.
-  final public function __construct() {}
+  /**
+ * Final constructor, so we can use a factory method above.
+ */
+  final public function __construct() {
+  }
 
   /**
    * Initialize the instrumentation with configuration options.
@@ -122,6 +129,9 @@ trait InstrumentationTrait {
     return $this->instrumentation;
   }
 
+  /**
+   *
+   */
   public function helperHook(
     string $methodName,
     array $paramMap = [],
@@ -144,6 +154,9 @@ trait InstrumentationTrait {
     return $this;
   }
 
+  /**
+   *
+   */
   protected function preHook(
     string $operation,
     array $resolvedParamMap = [],
@@ -156,7 +169,11 @@ trait InstrumentationTrait {
       string $function,
       ?string $filename,
       ?int $lineno,
-    ) use ($operation, $resolvedParamMap, $customHandler): void {
+    ) use (
+$operation,
+ $resolvedParamMap,
+ $customHandler
+): void {
       $parent = static::getCurrentContext();
 
       /** @var \OpenTelemetry\API\Instrumentation\CachedInstrumentation $instrumentation */
@@ -191,6 +208,9 @@ trait InstrumentationTrait {
     };
   }
 
+  /**
+   *
+   */
   protected function postHook(
     string $operation,
     ?string $resultAttribute = NULL,
@@ -201,7 +221,10 @@ trait InstrumentationTrait {
       array $params,
       $returnValue,
       ?\Throwable $exception,
-    ) use ($resultAttribute, $customHandler): void {
+    ) use (
+$resultAttribute,
+ $customHandler
+): void {
       $scope = static::getContextStorage()->scope();
       if (!$scope) {
         return;
@@ -230,6 +253,9 @@ trait InstrumentationTrait {
     };
   }
 
+  /**
+   *
+   */
   protected static function resolveParamPositions(
     ?string $className,
     string $methodName,
@@ -239,12 +265,13 @@ trait InstrumentationTrait {
       return [];
     }
 
-    if ($className === null) {
-        // Handle standalone functions
-        $reflection = new \ReflectionFunction($methodName);
-    } else {
-        // Handle class methods
-        $reflection = new \ReflectionMethod($className, $methodName);
+    if ($className === NULL) {
+      // Handle standalone functions.
+      $reflection = new \ReflectionFunction($methodName);
+    }
+    else {
+      // Handle class methods.
+      $reflection = new \ReflectionMethod($className, $methodName);
     }
 
     $parameters = $reflection->getParameters();
@@ -297,4 +324,5 @@ trait InstrumentationTrait {
   protected static function getSpanFromContext(ContextInterface $context): object {
     return Span::fromContext($context);
   }
+
 }
