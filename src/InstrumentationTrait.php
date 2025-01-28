@@ -116,12 +116,14 @@ trait InstrumentationTrait {
     ?string $className = NULL,
   ): self {
     $targetClass = $className ?? $this->className;
+    $operation = $targetClass ? "$targetClass::$methodName" : $methodName;
+
     $resolvedParamMap = static::resolveParamPositions($targetClass, $methodName, $paramMap);
     static::registerHook(
       $targetClass,
       $methodName,
-      pre: $this->preHook("$targetClass::$methodName", $resolvedParamMap, $preHandler),
-      post: $this->postHook("$targetClass::$methodName", $returnValueKey, $postHandler)
+      pre: $this->preHook($operation, $resolvedParamMap, $preHandler),
+      post: $this->postHook($operation, $returnValueKey, $postHandler)
     );
 
     return $this;
@@ -214,7 +216,7 @@ trait InstrumentationTrait {
   }
 
   protected static function resolveParamPositions(
-    string $className,
+    ?string $className,
     string $methodName,
     array $paramMap,
   ): array {
@@ -222,7 +224,14 @@ trait InstrumentationTrait {
       return [];
     }
 
-    $reflection = new \ReflectionMethod($className, $methodName);
+    if ($className === null) {
+        // Handle standalone functions
+        $reflection = new \ReflectionFunction($methodName);
+    } else {
+        // Handle class methods
+        $reflection = new \ReflectionMethod($className, $methodName);
+    }
+
     $parameters = $reflection->getParameters();
     $resolvedMap = [];
     foreach ($paramMap as $key => $value) {
@@ -244,7 +253,7 @@ trait InstrumentationTrait {
    * @codeCoverageIgnore
    */
   protected static function registerHook(
-    string $className,
+    ?string $className,
     string $methodName,
     callable $pre,
     callable $post,
