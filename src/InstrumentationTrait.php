@@ -9,6 +9,7 @@ use OpenTelemetry\API\Instrumentation\CachedInstrumentation;
 use OpenTelemetry\Context\Context;
 use OpenTelemetry\Context\ContextInterface;
 use OpenTelemetry\Context\ContextStorageInterface;
+use OpenTelemetry\SDK\Trace\ReadWriteSpanInterface;
 use OpenTelemetry\SemConv\TraceAttributes;
 use function OpenTelemetry\Instrumentation\hook;
 
@@ -25,6 +26,8 @@ trait InstrumentationTrait {
    * @var \OpenTelemetry\API\Trace\SpanKind::KIND_* */
   protected int $spanKind = SpanKind::KIND_INTERNAL;
   protected ?string $className = NULL;
+
+  public const UPDATE_NAME = 'X-PerformanceX-OpenTelemetry-Update-Name';
 
   /**
    * Create new instrumentation with configuration options.
@@ -204,6 +207,13 @@ trait InstrumentationTrait {
       }
 
       $span = $spanBuilder->startSpan();
+      $updatedName = NULL;
+      if ($span instanceof ReadWriteSpanInterface) {
+        $updatedName = $span->getAttribute(static::UPDATE_NAME);
+      }
+      if ($updatedName) {
+        $span->updateName($updatedName);
+      }
       static::getContextStorage()->attach($span->storeInContext($parent));
     };
   }

@@ -95,6 +95,39 @@ The `helperHook()` method accepts:
 - `postHandler`: Optional callback for custom span finishing
 - `className`: Optional override of target class name
 
+## Dynamic Span Names
+The trait supports updating span names dynamically during span creation. This is particularly useful when the span name depends on runtime information:
+
+```php
+$instrumentation->helperHook(
+  'save',
+  ['entity'],
+  preHandler: function($spanBuilder, $object, array $params) {
+    $entity = $params[0];
+    // Instead of directly setting the name (which isn't possible at this stage),
+    // use the UPDATE_NAME attribute
+    $spanBuilder->setAttribute(
+      static::UPDATE_NAME,
+      sprintf(
+        'Entity save (%s:%s)',
+        $entity->getEntityTypeId(),
+        $entity->isNew() ? 'new' : $entity->id()
+      )
+    );
+  }
+);
+
+// When called with a new article entity:
+$entity->save();
+// Creates span with name: "Entity save (article:new)"
+
+// When called with an existing article entity:
+$entity->save();
+// Creates span with name: "Entity save (article:123)"
+```
+
+This approach is necessary because span names can only be set during span creation, but sometimes the desired name depends on runtime information available in the pre-handler. By setting the `X-PerformanceX-OpenTelemetry-Update-Name` attribute (available as `InstrumentationTrait::UPDATE_NAME`), the trait will automatically update the span name during creation.
+
 ## Parameter Mapping
 The `paramMap` argument in `helperHook()` supports several ways to map method parameters to span attributes:
 
@@ -302,7 +335,7 @@ try {
 ```
 
 ## Requirements
-- PHP 8.1+
+- PHP 8.2+
 - OpenTelemetry PHP SDK
 
 ## License
